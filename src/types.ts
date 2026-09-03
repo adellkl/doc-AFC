@@ -1,6 +1,6 @@
 export type ApplicationStatus = 'to_review' | 'complete' | 'incomplete'
 
-export type DocumentKind = 'identity_card' | 'medical_certificate'
+export type DocumentKind = 'identity_card' | 'medical_certificate' | 'profile_photo'
 
 export interface StoredDocument {
   id: string
@@ -15,15 +15,13 @@ export interface ApplicationRecord {
   id: string
   firstName: string
   lastName: string
-  email: string
-  phone: string
-  address: string
   consentAcceptedAt: string
   createdAt: string
   status: ApplicationStatus
   documents: Partial<{
     identityCard: StoredDocument
     medicalCertificate: StoredDocument
+    profilePhoto: StoredDocument
   }>
 }
 
@@ -36,9 +34,7 @@ export interface SubmittedApplication {
 export interface NewApplication {
   firstName: string
   lastName: string
-  email: string
-  phone: string
-  address: string
   identityCard: File
   medicalCertificate: File
+  profilePhoto: File
 }

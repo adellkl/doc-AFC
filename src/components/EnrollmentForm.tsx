@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom'
 import { saveApplication } from '../lib/database'
 import { formatDateTime } from '../lib/format'
 import type { SubmittedApplication } from '../types'
+import teamPhoto from '../assets/alpha-fight-club-groupe.jpg'
 import { BrandMark } from './BrandMark'
 import { ConfettiBurst } from './ConfettiBurst'
 import { FileDropzone } from './FileDropzone'
@@ -18,17 +19,11 @@ import { FileDropzone } from './FileDropzone'
 type FormValues = {
   firstName: string
   lastName: string
-  email: string
-  phone: string
-  address: string
 }
 
 const emptyValues: FormValues = {
   firstName: '',
   lastName: '',
-  email: '',
-  phone: '',
-  address: '',
 }
 
 type FloatingFieldProps = {
@@ -39,6 +34,8 @@ type FloatingFieldProps = {
   autoComplete: string
   type?: 'email' | 'tel' | 'text'
   multiline?: boolean
+  maxLength: number
+  pattern?: string
 }
 
 function FloatingField({
@@ -49,6 +46,8 @@ function FloatingField({
   autoComplete,
   type = 'text',
   multiline = false,
+  maxLength,
+  pattern,
 }: FloatingFieldProps) {
   const controlClassName = `peer block w-full rounded-[1rem] border border-[#D4CCBE] bg-[#FFFEFA] px-4 font-sans text-sm text-[#17201B] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-transparent hover:border-[#ABB7B0] focus:border-[#245A43] focus:shadow-[0_0_0_2px_rgba(36,90,67,0.10)] ${
     multiline ? 'min-h-32 resize-y pb-3 pt-6 leading-6' : 'h-14 pb-2 pt-5'
@@ -66,6 +65,7 @@ function FloatingField({
           autoComplete={autoComplete}
           placeholder=" "
           required
+          maxLength={maxLength}
         />
       ) : (
         <input
@@ -77,6 +77,8 @@ function FloatingField({
           autoComplete={autoComplete}
           placeholder=" "
           required
+          maxLength={maxLength}
+          pattern={pattern}
         />
       )}
       <label
@@ -139,6 +141,7 @@ export function EnrollmentForm() {
   const [values, setValues] = useState<FormValues>(emptyValues)
   const [identityCard, setIdentityCard] = useState<File | null>(null)
   const [medicalCertificate, setMedicalCertificate] = useState<File | null>(null)
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null)
   const [hasConsent, setHasConsent] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
@@ -157,8 +160,8 @@ export function EnrollmentForm() {
       return
     }
 
-    if (!identityCard || !medicalCertificate) {
-      setFormError('Ajoutez votre pièce d’identité et votre certificat médical avant de transmettre le dossier.')
+    if (!identityCard || !medicalCertificate || !profilePhoto) {
+      setFormError('Ajoutez votre pièce d’identité, votre certificat médical et votre photo avant de transmettre le dossier.')
       return
     }
 
@@ -169,9 +172,10 @@ export function EnrollmentForm() {
 
     try {
       setIsSubmitting(true)
-      const record = await saveApplication({ ...values, identityCard, medicalCertificate })
+      const record = await saveApplication({ ...values, identityCard, medicalCertificate, profilePhoto })
       setSubmittedRecord(record)
-    } catch {
+    } catch (error) {
+      console.error(error)
       setFormError('Le dossier n’a pas pu être enregistré. Réessayez dans quelques instants.')
     } finally {
       setIsSubmitting(false)
@@ -184,7 +188,13 @@ export function EnrollmentForm() {
 
   return (
     <main className="min-h-[100svh] bg-[#F7F4EE] md:grid md:grid-cols-[minmax(15rem,36%)_minmax(0,1fr)] lg:grid-cols-[minmax(18rem,5fr)_minmax(0,7fr)]">
-      <aside className="relative overflow-hidden bg-[#17201B] px-4 pb-6 pt-5 text-[#F7F4EE] sm:px-8 sm:py-8 md:sticky md:top-0 md:min-h-[100svh] md:px-6 md:py-7 lg:px-10 lg:py-10">
+      <aside className="relative overflow-hidden bg-[#17201B] px-4 pb-6 pt-5 text-[#F7F4EE] sm:px-8 sm:py-8 md:sticky md:top-0 md:min-h-[100svh] md:self-start md:px-6 md:py-7 lg:px-10 lg:py-10">
+        <img
+          className="absolute inset-0 h-full w-full object-cover object-[center_58%] opacity-35"
+          src={teamPhoto}
+          alt="Membres d'Alpha Fight Club réunis sur les tatamis"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#17201B]/82 via-[#17201B]/68 to-[#17201B]/92" aria-hidden="true" />
         <div className="relative mx-auto flex h-full max-w-md flex-col">
           <div className="flex items-start justify-between gap-4">
             <BrandMark inverse />
@@ -207,10 +217,9 @@ export function EnrollmentForm() {
             </p>
           </div>
 
-          <ol className="mt-6 grid grid-cols-3 gap-2 border-t border-[#F7F4EE]/15 pt-4 font-sans text-[9px] uppercase tracking-[0.1em] text-[#F7F4EE]/65 sm:mt-10 sm:text-[11px] md:mt-auto md:grid-cols-1 md:gap-3 md:pt-6 md:tracking-[0.13em]">
+          <ol className="mt-6 grid grid-cols-2 gap-2 border-t border-[#F7F4EE]/15 pt-4 font-sans text-[9px] uppercase tracking-[0.1em] text-[#F7F4EE]/65 sm:mt-10 sm:text-[11px] md:mt-auto md:grid-cols-1 md:gap-3 md:pt-6 md:tracking-[0.13em]">
             <li className="flex flex-col gap-1 sm:flex-row sm:gap-3"><span className="text-[#D8FF41]">01</span><span>Identité</span></li>
-            <li className="flex flex-col gap-1 sm:flex-row sm:gap-3"><span className="text-[#D8FF41]">02</span><span>Coordonnées</span></li>
-            <li className="flex flex-col gap-1 sm:flex-row sm:gap-3"><span className="text-[#D8FF41]">03</span><span>Pièces</span></li>
+            <li className="flex flex-col gap-1 sm:flex-row sm:gap-3"><span className="text-[#D8FF41]">02</span><span>Pièces</span></li>
           </ol>
         </div>
       </aside>
@@ -228,7 +237,7 @@ export function EnrollmentForm() {
               <span className="mb-1 shrink-0 font-sans text-[10px] uppercase tracking-[0.12em] text-[#69756D]">* obligatoire</span>
             </div>
             <p className="mt-4 max-w-xl font-sans text-sm leading-6 text-[#657168]">
-              Renseignez vos coordonnées puis ajoutez vos deux justificatifs pour finaliser votre inscription.
+              Renseignez votre identité puis ajoutez vos justificatifs pour finaliser votre inscription.
             </p>
           </div>
 
@@ -242,35 +251,17 @@ export function EnrollmentForm() {
               </div>
             </div>
             <div className="mt-6 grid gap-5 lg:grid-cols-2">
-              <FloatingField id="first-name" label="Prénom" value={values.firstName} onChange={updateValue('firstName')} autoComplete="given-name" />
-              <FloatingField id="last-name" label="Nom" value={values.lastName} onChange={updateValue('lastName')} autoComplete="family-name" />
+              <FloatingField id="first-name" label="Prénom" value={values.firstName} onChange={updateValue('firstName')} autoComplete="given-name" maxLength={120} />
+              <FloatingField id="last-name" label="Nom" value={values.lastName} onChange={updateValue('lastName')} autoComplete="family-name" maxLength={120} />
             </div>
           </fieldset>
 
           <fieldset className="rounded-[1.35rem] border border-[#E2DBCF] bg-[#FFFEFA] px-5 pb-6 pt-5 shadow-[0_18px_35px_rgba(23,32,27,0.045)] transition-colors duration-200 focus-within:border-[#A2CDB5] sm:rounded-[1.5rem] sm:px-7 sm:pb-7 sm:pt-6">
-            <legend className="sr-only">02 — Coordonnées</legend>
+            <legend className="sr-only">02 — Pièces justificatives</legend>
             <div className="flex items-center gap-3">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#E9ECFF] font-sans text-[11px] font-medium text-[#3C56D7]">02</span>
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#FFF0DE] font-sans text-[11px] font-medium text-[#9F6228]">02</span>
               <div>
                 <p className="font-sans text-[10px] font-medium uppercase tracking-[0.14em] text-[#657168]">Deuxième étape</p>
-                <h3 className="mt-0.5 font-sans text-base font-bold text-[#17201B]">Vos coordonnées</h3>
-              </div>
-            </div>
-            <div className="mt-6 grid gap-5 lg:grid-cols-2">
-              <FloatingField id="email" label="Adresse e-mail" value={values.email} onChange={updateValue('email')} autoComplete="email" type="email" />
-              <FloatingField id="phone" label="Numéro de téléphone" value={values.phone} onChange={updateValue('phone')} autoComplete="tel" type="tel" />
-            </div>
-            <div className="mt-5">
-              <FloatingField id="address" label="Adresse postale" value={values.address} onChange={updateValue('address')} autoComplete="street-address" multiline />
-            </div>
-          </fieldset>
-
-          <fieldset className="rounded-[1.35rem] border border-[#E2DBCF] bg-[#FFFEFA] px-5 pb-6 pt-5 shadow-[0_18px_35px_rgba(23,32,27,0.045)] transition-colors duration-200 focus-within:border-[#A2CDB5] sm:rounded-[1.5rem] sm:px-7 sm:pb-7 sm:pt-6">
-            <legend className="sr-only">03 — Pièces justificatives</legend>
-            <div className="flex items-center gap-3">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#FFF0DE] font-sans text-[11px] font-medium text-[#9F6228]">03</span>
-              <div>
-                <p className="font-sans text-[10px] font-medium uppercase tracking-[0.14em] text-[#657168]">Dernière étape</p>
                 <h3 className="mt-0.5 font-sans text-base font-bold text-[#17201B]">Vos pièces justificatives</h3>
               </div>
             </div>
@@ -287,6 +278,13 @@ export function EnrollmentForm() {
                 description="Certificat d’aptitude à la pratique du grappling"
                 file={medicalCertificate}
                 onChange={setMedicalCertificate}
+              />
+              <FileDropzone
+                label="Photo de profil"
+                description="Photo JPG ou PNG pour identifier votre dossier"
+                file={profilePhoto}
+                onChange={setProfilePhoto}
+                acceptImagesOnly
               />
             </div>
           </fieldset>

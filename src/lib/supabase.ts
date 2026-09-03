@@ -103,9 +103,16 @@ export const getCurrentAdmin = async (): Promise<User | null> => {
   return admin?.user_id === userData.user.id ? userData.user : null
 }
 
-export const signInAdministrator = async (email: string, password: string) => {
+const getAdministratorEmail = (accessCode: string) => {
+  const domain = import.meta.env.VITE_ADMIN_LOGIN_DOMAIN?.trim() || 'admin.alphafightclub.local'
+  if (!/^[a-z0-9.-]+$/i.test(domain)) throw new SupabaseConfigurationError()
+
+  return `admin-${accessCode}@${domain}`
+}
+
+export const signInAdministrator = async (accessCode: string, password: string) => {
   const { data, error } = await getSupabaseClient().auth.signInWithPassword({
-    email: email.trim(),
+    email: getAdministratorEmail(accessCode),
     password,
   })
 

@@ -17,12 +17,10 @@ const MAX_MULTIPART_BYTES = MAX_FILE_BYTES * 2 + 1024 * 1024
 const REQUIRED_FIELDS = new Set([
   "firstName",
   "lastName",
-  "email",
-  "phone",
-  "address",
   "consent",
   "identityCard",
   "medicalCertificate",
+  "profilePhoto",
 ])
 
 type DetectedDocumentType = {
@@ -36,17 +34,14 @@ type ValidatedDocument = DetectedDocumentType & {
 }
 
 type ValidatedApplication = {
-  address: string
-  email: string
   firstName: string
   identityCard: ValidatedDocument
   lastName: string
   medicalCertificate: ValidatedDocument
-  phone: string
+  profilePhoto: ValidatedDocument
 }
 
-// Multipart contract (all keys are required): firstName, lastName, email,
-// phone, address, consent=true, identityCard, medicalCertificate.
+// Multipart contract: firstName, lastName, consent=true and three documents.
 Deno.serve(async (request) => {
   let corsHeaders: Record<string, string> = {}
 
@@ -95,9 +90,12 @@ function validateMultipartRequest(request: Request): void {
     throw new HttpError(415, "Content-Type must be multipart/form-data")
   }
 
+  // HTTP/2 and some browsers omit Content-Length. File size is still
+  // enforced after parsing; this header is only a cheap pre-check.
   const contentLengthHeader = request.headers.get("content-length")
-  if (!contentLengthHeader || !/^\d+$/.test(contentLengthHeader)) {
-    throw new HttpError(411, "Content-Length is required")
+  if (!contentLengthHeader) return
+  if (!/^\d+$/.test(contentLengthHeader)) {
+    throw new HttpError(400, "Invalid Content-Length")
   }
 
   const contentLength = Number(contentLengthHeader)
@@ -158,9 +156,6 @@ async function parseMultipartFormData(request: Request): Promise<FormData> {
 async function validateApplication(formData: FormData): Promise<ValidatedApplication> {
   const firstName = validateTextField(getSingleText(formData, "firstName"), "first name", 120)
   const lastName = validateTextField(getSingleText(formData, "lastName"), "last name", 120)
-  const email = validateEmail(getSingleText(formData, "email"))
-  const phone = validatePhone(getSingleText(formData, "phone"))
-  const address = validateTextField(getSingleText(formData, "address"), "address", 500, true)
   const consent = getSingleText(formData, "consent")
   if (consent !== "true") {
     throw new HttpError(400, "Consent is required")
@@ -170,16 +165,23 @@ async function validateApplication(formData: FormData): Promise<ValidatedApplica
     validateDocument(getSingleFile(formData, "identityCard")),
     validateDocument(getSingleFile(formData, "medicalCertificate")),
   ])
+  const profilePhoto = await validateProfilePhoto(getSingleFile(formData, "profilePhoto"))
 
   return {
-    address,
-    email,
     firstName,
     identityCard,
     lastName,
     medicalCertificate,
-    phone,
+    profilePhoto,
   }
+}
+
+async function validateProfilePhoto(file: File): Promise<ValidatedDocument> {
+  const document = await validateDocument(file)
+  if (document.mimeType === "application/pdf") {
+    throw new HttpError(400, "The profile photo must be a JPEG or PNG")
+  }
+  return document
 }
 
 function getSingleText(formData: FormData, field: string): string {
@@ -210,22 +212,6 @@ function validateTextField(value: string, field: string, maxLength: number, allo
   return normalized
 }
 
-function validateEmail(value: string): string {
-  const email = validateTextField(value, "email", 320)
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new HttpError(400, "Invalid email")
-  }
-  return email
-}
-
-function validatePhone(value: string): string {
-  const phone = validateTextField(value, "phone", 32)
-  if (phone.length < 7 || !/^[0-9+().\s-]+$/.test(phone)) {
-    throw new HttpError(400, "Invalid phone")
-  }
-  return phone
-}
-
 async function validateDocument(file: File): Promise<ValidatedDocument> {
   if (file.size <= 0 || file.size > MAX_FILE_BYTES) {
     throw new HttpError(400, "Each document must be between 1 byte and 10 MiB")
@@ -238,7 +224,7 @@ async function validateDocument(file: File): Promise<ValidatedDocument> {
   }
 
   const declaredType = file.type.trim().toLowerCase()
-  if (declaredType && declaredType !== detectedType.mimeType) {
+  if (declaredType && !isCompatibleDeclaredType(declaredType, detectedType.mimeType)) {
     throw new HttpError(400, "The document MIME type does not match its content")
   }
   if (!hasMatchingExtension(originalName, detectedType.extension)) {
@@ -272,12 +258,17 @@ async function detectDocumentType(file: File): Promise<DetectedDocumentType | nu
     return { extension: "png", mimeType: "image/png" }
   }
   if (startsWith(header, [0xff, 0xd8, 0xff])) {
-    const trailer = new Uint8Array(await file.slice(file.size - 2, file.size).arrayBuffer())
-    if (trailer[0] === 0xff && trailer[1] === 0xd9) {
-      return { extension: "jpg", mimeType: "image/jpeg" }
-    }
+    return { extension: "jpg", mimeType: "image/jpeg" }
   }
   return null
+}
+
+function isCompatibleDeclaredType(
+  declaredType: string,
+  detectedType: DetectedDocumentType["mimeType"],
+): boolean {
+  if (declaredType === detectedType) return true
+  return detectedType === "image/jpeg" && (declaredType === "image/jpg" || declaredType === "image/pjpeg")
 }
 
 function startsWith(value: Uint8Array, prefix: number[]): boolean {
@@ -294,6 +285,11 @@ async function storeApplication(
       document: application.identityCard,
       kind: "identity_card",
       path: `${applicationId}/identity-card.${application.identityCard.extension}`,
+    },
+    {
+      document: application.profilePhoto,
+      kind: "profile_photo",
+      path: `${applicationId}/profile-photo.${application.profilePhoto.extension}`,
     },
     {
       document: application.medicalCertificate,
@@ -321,9 +317,6 @@ async function storeApplication(
         id: applicationId,
         first_name: application.firstName,
         last_name: application.lastName,
-        email: application.email,
-        phone: application.phone,
-        address: application.address,
         consent_accepted_at: new Date().toISOString(),
       })
       .select("id, created_at, status")

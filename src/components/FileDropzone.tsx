@@ -11,12 +11,13 @@ type FileDropzoneProps = {
   description: string
   file: File | null
   onChange: (file: File | null) => void
+  acceptImagesOnly?: boolean
 }
 
 const hasAllowedExtension = (name: string) =>
   acceptedExtensions.some((extension) => name.toLowerCase().endsWith(extension))
 
-export function FileDropzone({ label, description, file, onChange }: FileDropzoneProps) {
+export function FileDropzone({ label, description, file, onChange, acceptImagesOnly = false }: FileDropzoneProps) {
   const inputId = useId()
   const helpId = useId()
   const errorId = useId()
@@ -28,8 +29,10 @@ export function FileDropzone({ label, description, file, onChange }: FileDropzon
     if (!candidate) return
 
     const hasKnownType = candidate.type.length > 0
-    if (!hasAllowedExtension(candidate.name) || (hasKnownType && !acceptedTypes.has(candidate.type))) {
-      setError('Choisissez un PDF, JPG ou PNG.')
+    const allowedTypes = acceptImagesOnly ? new Set(['image/jpeg', 'image/png']) : acceptedTypes
+    const allowedExtensions = acceptImagesOnly ? ['.jpg', '.jpeg', '.png'] : acceptedExtensions
+    if (!allowedExtensions.some((extension) => candidate.name.toLowerCase().endsWith(extension)) || (hasKnownType && !allowedTypes.has(candidate.type))) {
+      setError(acceptImagesOnly ? 'Choisissez une image JPG ou PNG.' : 'Choisissez un PDF, JPG ou PNG.')
       return
     }
 
@@ -59,7 +62,7 @@ export function FileDropzone({ label, description, file, onChange }: FileDropzon
         id={inputId}
         className="sr-only"
         type="file"
-        accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
+        accept={acceptImagesOnly ? 'image/jpeg,image/png,.jpg,.jpeg,.png' : 'application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png'}
         aria-label={label}
         aria-describedby={`${helpId} ${error ? errorId : ''}`}
         aria-invalid={Boolean(error)}
@@ -68,10 +71,10 @@ export function FileDropzone({ label, description, file, onChange }: FileDropzon
       />
 
       {file ? (
-        <div className="relative flex min-h-32 items-center gap-3 overflow-hidden rounded-[1.1rem] border border-[#A2CDB5] bg-[#F7FFF8] px-4 py-4 shadow-[0_8px_20px_rgba(36,90,67,0.07)] sm:min-h-28 sm:px-5">
+        <div className="relative flex min-h-24 items-center gap-3 overflow-hidden rounded-[1.1rem] border border-[#A2CDB5] bg-[#F7FFF8] px-4 py-3 shadow-[0_8px_20px_rgba(36,90,67,0.07)] sm:min-h-24 sm:px-5">
           <span className="absolute right-0 top-0 h-8 w-8 border-b border-l border-[#A2CDB5] bg-[#E5F3E9]" />
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#245A43] text-white">
-            <FileCheck2 size={20} strokeWidth={1.8} />
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#245A43] text-white">
+            <FileCheck2 size={18} strokeWidth={1.8} />
           </span>
           <div className="min-w-0 flex-1 pr-2">
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.14em] text-[#427158]">
@@ -110,14 +113,14 @@ export function FileDropzone({ label, description, file, onChange }: FileDropzon
           }}
           onDrop={onDrop}
         >
-          <span className="absolute right-0 top-0 h-9 w-9 border-b border-l border-[#D4CCBE] bg-[#F7F4EE]" />
+          <span className="absolute right-0 top-0 h-8 w-8 border-b border-l border-[#D4CCBE] bg-[#F7F4EE]" />
           <button
             type="button"
-            className="flex min-h-32 w-full items-center gap-4 rounded-[0.85rem] px-4 py-4 text-left outline-none transition-colors active:bg-[#F3F5FF] focus-visible:ring-2 focus-visible:ring-[#3C56D7] sm:min-h-28 sm:px-5"
+            className="flex min-h-24 w-full items-center gap-3 rounded-[0.85rem] px-4 py-3 text-left outline-none transition-colors active:bg-[#F3F5FF] focus-visible:ring-2 focus-visible:ring-[#3C56D7] sm:min-h-24 sm:px-5"
             onClick={() => inputRef.current?.click()}
           >
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#D4CCBE] bg-[#F7F4EE] text-[#245A43] transition-colors group-hover:bg-[#E5F3E9]">
-              <Upload size={20} strokeWidth={1.7} />
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#D4CCBE] bg-[#F7F4EE] text-[#245A43] transition-colors group-hover:bg-[#E5F3E9]">
+              <Upload size={18} strokeWidth={1.7} />
             </span>
             <span>
               <span className="block font-sans text-sm font-semibold text-[#17201B]">{label}</span>

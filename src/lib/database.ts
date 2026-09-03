@@ -21,9 +21,6 @@ type ApplicationRow = {
   id: string
   first_name: string
   last_name: string
-  email: string
-  phone: string
-  address: string
   consent_accepted_at: string
   created_at: string
   status: ApplicationStatus
@@ -40,13 +37,14 @@ export class ApplicationServiceError extends Error {
 const documentSlotByKind = {
   identity_card: 'identityCard',
   medical_certificate: 'medicalCertificate',
+  profile_photo: 'profilePhoto',
 } as const
 
 const isApplicationStatus = (value: unknown): value is ApplicationStatus =>
   value === 'to_review' || value === 'complete' || value === 'incomplete'
 
 const isDocumentKind = (value: unknown): value is DocumentKind =>
-  value === 'identity_card' || value === 'medical_certificate'
+  value === 'identity_card' || value === 'medical_certificate' || value === 'profile_photo'
 
 const toStoredDocument = (row: ApplicationDocumentRow): StoredDocument => ({
   id: row.id,
@@ -73,9 +71,6 @@ const toApplicationRecord = (row: ApplicationRow): ApplicationRecord => {
     id: row.id,
     firstName: row.first_name,
     lastName: row.last_name,
-    email: row.email,
-    phone: row.phone,
-    address: row.address,
     consentAcceptedAt: row.consent_accepted_at,
     createdAt: row.created_at,
     status: row.status,
@@ -97,42 +92,45 @@ const parseJson = async (response: Response): Promise<unknown> => {
 }
 
 export async function saveApplication(input: NewApplication): Promise<SubmittedApplication> {
-  const submittedAt = new Date().toISOString()
   const { publishableKey, submitFunction } = getSupabaseConfig()
   const body = new FormData()
 
   body.set('firstName', input.firstName.trim())
   body.set('lastName', input.lastName.trim())
-  body.set('email', input.email.trim())
-  body.set('phone', input.phone.trim())
-  body.set('address', input.address.trim())
-  body.set('consentAcceptedAt', submittedAt)
+  body.set('consent', 'true')
   body.set('identityCard', input.identityCard, input.identityCard.name)
   body.set('medicalCertificate', input.medicalCertificate, input.medicalCertificate.name)
+  body.set('profilePhoto', input.profilePhoto, input.profilePhoto.name)
 
   let response: Response
   try {
     response = await fetch(getFunctionUrl(submitFunction), {
       method: 'POST',
       headers: {
+        Authorization: `Bearer ${publishableKey}`,
         apikey: publishableKey,
       },
       body,
       credentials: 'omit',
     })
-  } catch {
+  } catch (error) {
+    console.error('Application submission network failure', error)
     throw new ApplicationServiceError()
   }
 
   const payload = await parseJson(response)
   if (!response.ok || !payload || typeof payload !== 'object' || !('applicationId' in payload) || typeof payload.applicationId !== 'string') {
+    console.error('Application submission rejected', response.status, payload)
     throw new ApplicationServiceError()
   }
+
+  const createdAt =
+    'createdAt' in payload && typeof payload.createdAt === 'string' ? payload.createdAt : new Date().toISOString()
 
   return {
     id: payload.applicationId,
     firstName: input.firstName.trim(),
-    createdAt: submittedAt,
+    createdAt,
   }
 }
 
@@ -143,9 +141,6 @@ export async function getApplications(): Promise<ApplicationRecord[]> {
       id,
       first_name,
       last_name,
-      email,
-      phone,
-      address,
       consent_accepted_at,
       created_at,
       status,

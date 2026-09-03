@@ -6,9 +6,6 @@ import {
   ExternalLink,
   FileText,
   LogOut,
-  Mail,
-  MapPin,
-  Phone,
   Search,
   ShieldCheck,
   UserRound,
@@ -214,6 +211,7 @@ function DetailPanel({
   }
 
   const attachedDocuments = [
+    { label: 'Photo de profil', documentFile: application.documents.profilePhoto },
     { label: 'Carte d’identité', documentFile: application.documents.identityCard },
     { label: 'Certificat médical', documentFile: application.documents.medicalCertificate },
   ].filter((item): item is { label: string; documentFile: StoredDocument } => Boolean(item.documentFile))
@@ -223,14 +221,12 @@ function DetailPanel({
       'ALPHA FIGHT CLUB — DOSSIER D’ADHÉSION',
       '',
       `Nom : ${application.firstName} ${application.lastName}`,
-      `E-mail : ${application.email}`,
-      `Téléphone : ${application.phone}`,
-      `Adresse : ${application.address}`,
       `Reçu le : ${formatDateTime(application.createdAt)}`,
       `État : ${statusMeta[application.status].label}`,
       '',
       `Pièce d’identité : ${application.documents.identityCard?.name ?? 'Non reçue'}`,
       `Certificat médical : ${application.documents.medicalCertificate?.name ?? 'Non reçu'}`,
+      `Photo de profil : ${application.documents.profilePhoto?.name ?? 'Non reçue'}`,
     ].join('\n')
 
     downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), `dossier-${application.lastName.toLowerCase()}.txt`)
@@ -249,15 +245,6 @@ function DetailPanel({
       </div>
 
       <p className="mt-4 font-sans text-[10px] text-[#69756D]">Transmis le {formatDateTime(application.createdAt)}</p>
-
-      <div className="mt-6 border-y border-[#D4CCBE] py-5">
-        <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#69756D]">Coordonnées</p>
-        <ul className="mt-4 grid gap-3 font-sans text-sm text-[#37443C]">
-          <li className="flex gap-2.5"><Mail className="mt-0.5 shrink-0 text-[#245A43]" size={16} /> <a className="break-all hover:text-[#3C56D7]" href={`mailto:${application.email}`}>{application.email}</a></li>
-          <li className="flex gap-2.5"><Phone className="mt-0.5 shrink-0 text-[#245A43]" size={16} /> <a className="hover:text-[#3C56D7]" href={`tel:${application.phone}`}>{application.phone}</a></li>
-          <li className="flex gap-2.5"><MapPin className="mt-0.5 shrink-0 text-[#245A43]" size={16} /> <span className="leading-5">{application.address}</span></li>
-        </ul>
-      </div>
 
       <div className="mt-6">
         <div className="flex items-center justify-between gap-3">
@@ -373,7 +360,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     const normalizedQuery = query.trim().toLocaleLowerCase('fr-FR')
     return applications.filter((application) => {
       const matchesFilter = filter === 'all' || application.status === filter
-      const searchable = `${application.firstName} ${application.lastName} ${application.email} ${application.phone}`.toLocaleLowerCase('fr-FR')
+      const searchable = `${application.firstName} ${application.lastName}`.toLocaleLowerCase('fr-FR')
       return matchesFilter && (!normalizedQuery || searchable.includes(normalizedQuery))
     })
   }, [applications, filter, query])
@@ -512,7 +499,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                                 <span className="font-sans text-sm font-bold text-[#17201B]">{application.firstName} {application.lastName}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-4 font-sans text-xs text-[#536058]">{application.email}</td>
                             <td className="px-4 py-4 font-sans text-[10px] text-[#69756D]">{formatDate(application.createdAt)}</td>
                             <td className="px-4 py-4"><span className="inline-flex items-center gap-1 font-sans text-[10px] text-[#245A43]"><CircleCheckBig size={13} /> {countDocuments(application)} / 2</span></td>
                             <td className="px-4 py-4"><StatusBadge status={application.status} /></td>
