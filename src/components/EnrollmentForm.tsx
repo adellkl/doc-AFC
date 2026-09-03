@@ -105,14 +105,10 @@ function ApplicationSuccess({ record }: { record: SubmittedApplication }) {
       <div className="relative z-10 w-full max-w-2xl rounded-[1.75rem] border border-[#A2CDB5] bg-white p-6 shadow-[0_24px_80px_rgba(23,32,27,0.12)] sm:rounded-[2rem] sm:p-10">
         <div>
           <BrandMark compact />
-          <div className="mt-10 inline-flex -rotate-1 items-center gap-2 border-2 border-[#245A43] bg-[#E5F3E9] px-3 py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-[#245A43]">
-            <FileCheck2 size={16} strokeWidth={2} />
-            Dossier reçu
-          </div>
           <p className="mt-8 font-sans text-[11px] font-medium uppercase tracking-[0.16em] text-[#3C56D7]">
             Transmission confirmée
           </p>
-          <h1 ref={titleRef} tabIndex={-1} className="mt-3 max-w-xl font-sans text-4xl font-bold leading-[0.98] tracking-[-0.055em] text-[#17201B] outline-none sm:text-5xl">
+          <h1 ref={titleRef} tabIndex={-1} className="mt-3 whitespace-nowrap font-sans text-3xl font-bold leading-[0.98] tracking-[-0.055em] text-[#17201B] outline-none sm:text-[2.8rem]">
             Dossier transmis. Merci, {record.firstName}&nbsp;!
           </h1>
           <p className="mt-6 max-w-lg font-sans text-base leading-7 text-[#536058]">

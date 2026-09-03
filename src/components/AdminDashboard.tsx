@@ -82,6 +82,38 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
   )
 }
 
+function ConfirmationDialog({
+  title,
+  description,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+}: {
+  title: string
+  description: string
+  confirmLabel: string
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-[#17201B]/55 p-4 backdrop-blur-sm" role="presentation">
+      <section className="w-full max-w-sm rounded-2xl border border-[#D4CCBE] bg-[#FFFEFA] p-5 shadow-[0_24px_72px_rgba(23,32,27,0.3)] sm:p-6" role="dialog" aria-modal="true" aria-labelledby="confirmation-title">
+        <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.14em] text-[#3C56D7]">Confirmation requise</p>
+        <h2 id="confirmation-title" className="mt-3 font-sans text-2xl font-bold tracking-[-0.05em] text-[#17201B]">{title}</h2>
+        <p className="mt-3 font-sans text-sm leading-6 text-[#536058]">{description}</p>
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button type="button" className="rounded-xl border border-[#D4CCBE] px-4 py-3 font-sans text-sm font-bold text-[#245A43] transition hover:border-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]" onClick={onCancel}>
+            Annuler
+          </button>
+          <button type="button" className="rounded-xl bg-[#17201B] px-4 py-3 font-sans text-sm font-bold text-white transition hover:bg-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]" onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function StatCard({ value, label, colour }: { value: number; label: string; colour: 'green' | 'blue' | 'apricot' }) {
   const dot = {
     green: 'bg-[#D8FF41]',
@@ -99,15 +131,13 @@ function StatCard({ value, label, colour }: { value: number; label: string; colo
 }
 
 function MobileApplicationCard({ application, onOpen }: { application: ApplicationRecord; onOpen: () => void }) {
-  const initials = `${application.firstName[0] ?? ''}${application.lastName[0] ?? ''}`.toUpperCase()
-
   return (
     <button
       type="button"
       onClick={onOpen}
       className="flex min-h-[5.4rem] w-full items-center gap-3 px-4 py-3 text-left transition active:bg-[#F3F5FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#3C56D7]"
     >
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#E5F3E9] font-sans text-[10px] font-semibold text-[#245A43]">{initials}</span>
+      <ProfileAvatar application={application} size="h-10 w-10" />
       <span className="min-w-0 flex-1">
         <span className="flex items-center justify-between gap-2">
           <span className="truncate font-sans text-sm font-bold text-[#17201B]">{application.firstName} {application.lastName}</span>
@@ -121,6 +151,33 @@ function MobileApplicationCard({ application, onOpen }: { application: Applicati
       </span>
       <ChevronRight className="shrink-0 text-[#3C56D7]" size={19} />
     </button>
+  )
+}
+
+function ProfileAvatar({ application, size = 'h-9 w-9' }: { application: ApplicationRecord; size?: string }) {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const profilePhoto = application.documents.profilePhoto
+  const initials = `${application.firstName[0] ?? ''}${application.lastName[0] ?? ''}`.toUpperCase()
+
+  useEffect(() => {
+    let isCurrent = true
+    setPhotoUrl(null)
+
+    if (!profilePhoto) return () => { isCurrent = false }
+
+    void getDocumentSignedUrl(profilePhoto.id)
+      .then((url) => { if (isCurrent) setPhotoUrl(url) })
+      .catch(() => { if (isCurrent) setPhotoUrl(null) })
+
+    return () => { isCurrent = false }
+  }, [profilePhoto?.id])
+
+  return (
+    <span className={`grid shrink-0 place-items-center overflow-hidden rounded-full bg-[#E5F3E9] font-sans text-[10px] font-semibold text-[#245A43] ${size}`}>
+      {photoUrl ? (
+        <img className="h-full w-full object-cover" src={photoUrl} alt={`Photo de ${application.firstName} ${application.lastName}`} />
+      ) : initials}
+    </span>
   )
 }
 
@@ -335,6 +392,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [statusError, setStatusError] = useState('')
   const [isSavingStatus, setIsSavingStatus] = useState(false)
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
+  const [isLogoutConfirmationOpen, setIsLogoutConfirmationOpen] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState<ApplicationStatus | null>(null)
 
   const refreshApplications = async () => {
     setIsLoading(true)
@@ -343,7 +402,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       const records = await getApplications()
       setApplications(records)
       setSelectedId((current) =>
-        current && records.some((record) => record.id === current) ? current : records[0]?.id ?? null,
+        current && records.some((record) => record.id === current) ? current : null,
       )
     } catch {
       setLoadError('Le registre sécurisé est indisponible. Réessayez ou vérifiez votre connexion.')
@@ -401,7 +460,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <p className="font-sans text-[10px] uppercase tracking-[0.12em] text-[#D8FF41]">Accès équipe</p>
             <p className="mt-1 font-sans text-xs text-white/65">Registre des dossiers</p>
           </div>
-          <button type="button" className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 font-sans text-xs font-bold text-white/70 transition active:bg-white/10 hover:bg-white/10 hover:text-white xl:ml-0 xl:mt-3 xl:w-full" onClick={onLogout}>
+          <button type="button" className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 font-sans text-xs font-bold text-white/70 transition active:bg-white/10 hover:bg-white/10 hover:text-white xl:ml-0 xl:mt-3 xl:w-full" onClick={() => setIsLogoutConfirmationOpen(true)}>
             <LogOut size={16} /> Déconnexion
           </button>
         </div>
@@ -431,7 +490,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <label className="relative block lg:max-w-sm lg:flex-1">
                   <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#69756D]" size={17} />
-                  <input aria-label="Rechercher un dossier" className="w-full rounded-xl border border-[#D4CCBE] py-2.5 pl-10 pr-3 font-sans text-sm outline-none transition focus:border-[#3C56D7] focus:ring-3 focus:ring-[#DDE2FF]" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un nom, e-mail, numéro…" />
+                  <input aria-label="Rechercher un dossier" className="w-full rounded-xl border border-[#D4CCBE] py-2.5 pl-10 pr-3 font-sans text-sm outline-none transition focus:border-[#3C56D7] focus:ring-3 focus:ring-[#DDE2FF]" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un nom…" />
                 </label>
                 <div className="-mx-1 flex snap-x gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:pb-0">
                   {(Object.keys(filterLabels) as Filter[]).map((item) => (
@@ -480,7 +539,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     <thead className="border-b border-[#D4CCBE] bg-[#F7F4EE]">
                       <tr className="font-sans text-[10px] font-medium uppercase tracking-[0.12em] text-[#69756D]">
                         <th className="px-5 py-4">Adhérent</th>
-                        <th className="px-4 py-4">Contact</th>
                         <th className="px-4 py-4">Reçu le</th>
                         <th className="px-4 py-4">Pièces</th>
                         <th className="px-4 py-4">État</th>
@@ -490,17 +548,20 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     <tbody>
                       {filteredApplications.map((application) => {
                         const isSelected = selectedId === application.id
-                        const initials = `${application.firstName[0] ?? ''}${application.lastName[0] ?? ''}`.toUpperCase()
                         return (
-                          <tr key={application.id} className={`border-b border-[#E7E1D7] transition last:border-0 ${isSelected ? 'bg-[#F3F5FF]' : 'hover:bg-[#FAF8F3]'}`}>
+                          <tr
+                            key={application.id}
+                            className={`cursor-pointer border-b border-[#E7E1D7] transition last:border-0 ${isSelected ? 'bg-[#F3F5FF]' : 'hover:bg-[#FAF8F3]'}`}
+                            onClick={() => setSelectedId(application.id)}
+                          >
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
-                                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#E5F3E9] font-sans text-[10px] font-semibold text-[#245A43]">{initials}</span>
+                                <ProfileAvatar application={application} />
                                 <span className="font-sans text-sm font-bold text-[#17201B]">{application.firstName} {application.lastName}</span>
                               </div>
                             </td>
                             <td className="px-4 py-4 font-sans text-[10px] text-[#69756D]">{formatDate(application.createdAt)}</td>
-                            <td className="px-4 py-4"><span className="inline-flex items-center gap-1 font-sans text-[10px] text-[#245A43]"><CircleCheckBig size={13} /> {countDocuments(application)} / 2</span></td>
+                            <td className="px-4 py-4"><span className="inline-flex items-center gap-1 font-sans text-[10px] text-[#245A43]"><CircleCheckBig size={13} /> {countDocuments(application)} / 3</span></td>
                             <td className="px-4 py-4"><StatusBadge status={application.status} /></td>
                             <td className="px-4 py-4 text-right">
                               <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#3C56D7] transition hover:bg-[#DDE2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]" onClick={() => setSelectedId(application.id)} aria-label={`Ouvrir le dossier de ${application.firstName} ${application.lastName}`}>
@@ -516,23 +577,51 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 </>
               )}
             </div>
-            <div className="mt-5 hidden lg:block 2xl:hidden">
-              <DetailPanel application={selectedApplication} onStatusChange={changeStatus} isSavingStatus={isSavingStatus} statusError={statusError} />
+            {selectedApplication && (
+              <div className="mt-5 hidden lg:block 2xl:hidden">
+                <DetailPanel application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} isSavingStatus={isSavingStatus} statusError={statusError} />
+              </div>
+            )}
+          </div>
+          {selectedApplication && (
+            <div className="hidden 2xl:block">
+              <DetailPanel application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} isSavingStatus={isSavingStatus} statusError={statusError} />
             </div>
-          </div>
-          <div className="hidden 2xl:block">
-            <DetailPanel application={selectedApplication} onStatusChange={changeStatus} isSavingStatus={isSavingStatus} statusError={statusError} />
-          </div>
+          )}
         </div>
       </section>
       <MobileDetailSheet
         application={selectedApplication}
         isOpen={isMobileDetailOpen}
         onClose={() => setIsMobileDetailOpen(false)}
-        onStatusChange={changeStatus}
+        onStatusChange={(status) => setPendingStatus(status)}
         isSavingStatus={isSavingStatus}
         statusError={statusError}
       />
+      {isLogoutConfirmationOpen && (
+        <ConfirmationDialog
+          title="Se déconnecter ?"
+          description="Vous devrez saisir à nouveau votre code administrateur et votre mot de passe pour accéder au registre."
+          confirmLabel="Se déconnecter"
+          onCancel={() => setIsLogoutConfirmationOpen(false)}
+          onConfirm={() => {
+            setIsLogoutConfirmationOpen(false)
+            onLogout()
+          }}
+        />
+      )}
+      {pendingStatus && selectedApplication && (
+        <ConfirmationDialog
+          title="Modifier l’état du dossier ?"
+          description={`Le dossier de ${selectedApplication.firstName} ${selectedApplication.lastName} passera à l’état « ${statusMeta[pendingStatus].label} ».`}
+          confirmLabel="Confirmer"
+          onCancel={() => setPendingStatus(null)}
+          onConfirm={() => {
+            void changeStatus(pendingStatus)
+            setPendingStatus(null)
+          }}
+        />
+      )}
     </main>
   )
 }

@@ -23,7 +23,9 @@ export function AdminGate() {
 
     void getCurrentAdmin()
       .then((administrator) => { if (isCurrent) setIsAuthenticated(Boolean(administrator)) })
-      .catch(() => { if (isCurrent) setError('La vérification de votre session a échoué. Réessayez dans quelques instants.') })
+      // A failed restore must not block the login screen: the administrator
+      // can always establish a fresh session with the access code and password.
+      .catch(() => { if (isCurrent) setIsAuthenticated(false) })
       .finally(() => { if (isCurrent) setIsCheckingSession(false) })
 
     const { data: { subscription } } = getSupabaseClient().auth.onAuthStateChange((_event, session) => {

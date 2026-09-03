@@ -89,7 +89,17 @@ export const getCurrentAdmin = async (): Promise<User | null> => {
   const supabase = getSupabaseClient()
   const { data: userData, error: userError } = await supabase.auth.getUser()
 
-  if (userError) throw userError
+  if (userError) {
+    // A locally persisted session can outlive a configuration change or an
+    // expired token. Treat only auth rejections as a signed-out visitor so the
+    // administrator can authenticate again without seeing a false outage.
+    const status = 'status' in userError && typeof userError.status === 'number' ? userError.status : undefined
+    if (status === 401 || status === 403) {
+      await supabase.auth.signOut({ scope: 'local' })
+      return null
+    }
+    throw userError
+  }
   if (!userData.user) return null
 
   const { data: admin, error: adminError } = await supabase
