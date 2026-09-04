@@ -1,8 +1,10 @@
 import {
   ArrowDownToLine,
   ArrowLeft,
+  ChevronLeft,
   ChevronRight,
   CircleCheckBig,
+  Trash2,
   ExternalLink,
   FileText,
   LogOut,
@@ -14,12 +16,14 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import JSZip from 'jszip'
-import { getApplications, getDocumentSignedUrl, setApplicationStatus } from '../lib/database'
+import { deleteApplication, getApplications, getDocumentSignedUrl, setApplicationStatus } from '../lib/database'
 import { formatDate, formatDateTime, formatFileSize, statusMeta } from '../lib/format'
 import type { ApplicationRecord, ApplicationStatus, StoredDocument } from '../types'
 import { BrandMark } from './BrandMark'
 
 type Filter = 'all' | ApplicationStatus
+
+const applicationsPerPage = 10
 
 type AdminDashboardProps = {
   onLogout: () => void
@@ -193,6 +197,48 @@ function ProfileAvatar({ application, size = 'h-9 w-9' }: { application: Applica
   )
 }
 
+function ProfilePhotoPreview({
+  documentFile,
+  isSelected,
+  onSelectionChange,
+}: {
+  documentFile: StoredDocument
+  isSelected: boolean
+  onSelectionChange: (selected: boolean) => void
+}) {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isCurrent = true
+    void getDocumentSignedUrl(documentFile)
+      .then((url) => { if (isCurrent) setPhotoUrl(url) })
+      .catch(() => { if (isCurrent) setPhotoUrl(null) })
+    return () => { isCurrent = false }
+  }, [documentFile])
+
+  return (
+    <section className={`relative mt-5 aspect-[4/3] overflow-hidden rounded-2xl bg-[#17201B] transition ${isSelected ? 'ring-2 ring-[#3C56D7] ring-offset-2 ring-offset-[#F7F4EE]' : ''}`}>
+      <p className="sr-only">Photo de profil — {documentFile.name}, {formatFileSize(documentFile.size)}</p>
+      <div className="grid h-full w-full place-items-center">
+        {photoUrl ? (
+          <img className="h-full w-full object-cover object-center" src={photoUrl} alt="Photo de profil de l’adhérent" />
+        ) : (
+          <span className="font-sans text-xs text-[#69756D]">Chargement de la photo…</span>
+        )}
+      </div>
+      <label className="absolute right-3 top-3 grid h-9 w-9 cursor-pointer place-items-center rounded-full bg-white/90 shadow-sm backdrop-blur focus-within:ring-2 focus-within:ring-[#3C56D7]">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(event) => onSelectionChange(event.target.checked)}
+          className="h-4 w-4 rounded border-[#9AA59D] accent-[#245A43]"
+          aria-label="Sélectionner la photo de profil"
+        />
+      </label>
+    </section>
+  )
+}
+
 function DocumentAction({
   label,
   documentFile,
@@ -232,7 +278,7 @@ function DocumentAction({
   }
 
   return (
-    <article className={`rounded-2xl border bg-white p-4 transition ${isSelected ? 'border-[#3C56D7] ring-2 ring-[#DDE2FF]' : 'border-[#D4CCBE]'}`}>
+    <article className={`min-w-0 overflow-hidden rounded-2xl border bg-white p-4 transition ${isSelected ? 'border-[#3C56D7] ring-2 ring-[#DDE2FF]' : 'border-[#D4CCBE]'}`}>
       <div className="flex items-start gap-3">
         <label className="mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center">
           <input
@@ -252,7 +298,7 @@ function DocumentAction({
           <p className="mt-1 font-sans text-[10px] text-[#69756D]">{formatFileSize(documentFile.size)}</p>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid grid-cols-1 gap-2">
         <button
           type="button"
           className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#D4CCBE] px-3 py-2.5 font-sans text-xs font-bold text-[#245A43] transition hover:border-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7] disabled:cursor-wait disabled:opacity-60"
@@ -278,13 +324,19 @@ function DocumentAction({
 function DetailPanel({
   application,
   onStatusChange,
+  onDelete,
   isSavingStatus,
+  isDeleting,
   statusError,
+  deleteError,
 }: {
   application: ApplicationRecord | null
   onStatusChange: (status: ApplicationStatus) => void
+  onDelete: () => void
   isSavingStatus: boolean
+  isDeleting: boolean
   statusError: string
+  deleteError: string
 }) {
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
   const [isPreparingDownload, setIsPreparingDownload] = useState(false)
@@ -307,11 +359,15 @@ function DetailPanel({
     )
   }
 
+  const profilePhoto = application.documents.profilePhoto
   const attachedDocuments = [
-    { label: 'Photo de profil', documentFile: application.documents.profilePhoto },
     { label: 'Carte d’identité', documentFile: application.documents.identityCard },
     { label: 'Certificat médical', documentFile: application.documents.medicalCertificate },
   ].filter((item): item is { label: string; documentFile: StoredDocument } => Boolean(item.documentFile))
+  const selectableDocuments = [
+    ...(profilePhoto ? [{ label: 'Photo de profil', documentFile: profilePhoto }] : []),
+    ...attachedDocuments,
+  ]
 
   const downloadSummary = () => {
     const text = [
@@ -336,7 +392,7 @@ function DetailPanel({
   }
 
   const downloadSelection = async () => {
-    const selectedDocuments = attachedDocuments.filter(({ documentFile }) => selectedDocumentIds.includes(documentFile.id))
+    const selectedDocuments = selectableDocuments.filter(({ documentFile }) => selectedDocumentIds.includes(documentFile.id))
     if (selectedDocuments.length === 0) return
 
     try {
@@ -363,7 +419,7 @@ function DetailPanel({
   }
 
   return (
-    <aside className="rounded-2xl border border-[#D4CCBE] bg-[#F7F4EE] p-5 sm:p-6">
+    <aside className="min-w-0 overflow-hidden rounded-2xl border border-[#D4CCBE] bg-[#F7F4EE] p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#3C56D7]">Dossier sélectionné</p>
@@ -383,13 +439,13 @@ function DetailPanel({
             Fiche .txt <ArrowDownToLine size={13} />
           </button>
         </div>
-        {attachedDocuments.length > 0 && (
+        {selectableDocuments.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#EAF0EA] px-3 py-2.5">
             <label className="inline-flex cursor-pointer items-center gap-2 font-sans text-xs font-semibold text-[#245A43]">
               <input
                 type="checkbox"
-                checked={selectedDocumentIds.length === attachedDocuments.length}
-                onChange={(event) => setSelectedDocumentIds(event.target.checked ? attachedDocuments.map(({ documentFile }) => documentFile.id) : [])}
+                checked={selectedDocumentIds.length === selectableDocuments.length}
+                onChange={(event) => setSelectedDocumentIds(event.target.checked ? selectableDocuments.map(({ documentFile }) => documentFile.id) : [])}
                 className="h-4 w-4 rounded border-[#9AA59D] accent-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]"
               />
               Tout sélectionner
@@ -401,6 +457,13 @@ function DetailPanel({
               </button>
             )}
           </div>
+        )}
+        {profilePhoto && (
+          <ProfilePhotoPreview
+            documentFile={profilePhoto}
+            isSelected={selectedDocumentIds.includes(profilePhoto.id)}
+            onSelectionChange={(selected) => updateSelection(profilePhoto.id, selected)}
+          />
         )}
         <div className="mt-3 grid gap-3">
           {attachedDocuments.length > 0 ? (
@@ -440,6 +503,17 @@ function DetailPanel({
         </div>
         {statusError && <p className="mt-2 font-sans text-xs font-semibold text-[#9F3B22]" role="alert">{statusError}</p>}
       </div>
+      <div className="mt-5 border-t border-[#D4CCBE] pt-5">
+        <button
+          type="button"
+          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#E8B5A9] bg-[#FFF4F1] px-3 py-2.5 font-sans text-sm font-bold text-[#9F3B22] transition hover:bg-[#FCE4DE] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#F7C9BE]"
+          onClick={onDelete}
+          disabled={isDeleting}
+        >
+          <Trash2 size={16} /> {isDeleting ? 'Suppression…' : 'Supprimer le dossier'}
+        </button>
+        {deleteError && <p className="mt-2 font-sans text-xs font-semibold text-[#9F3B22]" role="alert">{deleteError}</p>}
+      </div>
     </aside>
   )
 }
@@ -449,22 +523,28 @@ function MobileDetailSheet({
   isOpen,
   onClose,
   onStatusChange,
+  onDelete,
   isSavingStatus,
+  isDeleting,
   statusError,
+  deleteError,
 }: {
   application: ApplicationRecord | null
   isOpen: boolean
   onClose: () => void
   onStatusChange: (status: ApplicationStatus) => void
+  onDelete: () => void
   isSavingStatus: boolean
+  isDeleting: boolean
   statusError: string
+  deleteError: string
 }) {
   if (!isOpen || !application) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-[#17201B]/45 p-0 backdrop-blur-[1px] lg:hidden" role="presentation">
       <button type="button" className="absolute inset-0 cursor-default" aria-label="Fermer la fiche" onClick={onClose} />
-      <section className="relative max-h-[92svh] w-full overflow-y-auto rounded-t-[1.8rem] bg-[#F7F4EE] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-16px_48px_rgba(23,32,27,0.22)]" role="dialog" aria-modal="true" aria-label={`Dossier de ${application.firstName} ${application.lastName}`}>
+      <section className="admin-detail-sheet relative max-h-[92svh] w-full overflow-y-auto rounded-t-[1.8rem] bg-[#F7F4EE] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-16px_48px_rgba(23,32,27,0.22)]" role="dialog" aria-modal="true" aria-label={`Dossier de ${application.firstName} ${application.lastName}`}>
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#D4CCBE] bg-[#F7F4EE]/95 px-5 py-3 backdrop-blur-sm">
           <div>
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.12em] text-[#3C56D7]">Dossier</p>
@@ -475,7 +555,7 @@ function MobileDetailSheet({
           </button>
         </header>
         <div className="p-4">
-          <DetailPanel application={application} onStatusChange={onStatusChange} isSavingStatus={isSavingStatus} statusError={statusError} />
+          <DetailPanel application={application} onStatusChange={onStatusChange} onDelete={onDelete} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
         </div>
       </section>
     </div>
@@ -494,6 +574,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
   const [isLogoutConfirmationOpen, setIsLogoutConfirmationOpen] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<ApplicationStatus | null>(null)
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const refreshApplications = async () => {
     setIsLoading(true)
@@ -524,6 +608,22 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     })
   }, [applications, filter, query])
 
+  const totalPages = Math.max(1, Math.ceil(filteredApplications.length / applicationsPerPage))
+  const paginatedApplications = filteredApplications.slice(
+    (currentPage - 1) * applicationsPerPage,
+    currentPage * applicationsPerPage,
+  )
+  const firstApplicationIndex = filteredApplications.length === 0 ? 0 : (currentPage - 1) * applicationsPerPage + 1
+  const lastApplicationIndex = Math.min(currentPage * applicationsPerPage, filteredApplications.length)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filter, query])
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages))
+  }, [totalPages])
+
   const selectedApplication = applications.find((application) => application.id === selectedId) ?? null
   const reviewCount = applications.filter((application) => application.status === 'to_review').length
   const completeCount = applications.filter((application) => application.status === 'complete').length
@@ -544,6 +644,22 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       setStatusError('La mise à jour n’a pas été enregistrée. Réessayez.')
     } finally {
       setIsSavingStatus(false)
+    }
+  }
+
+  const removeApplication = async () => {
+    if (!selectedApplication) return
+    try {
+      setIsDeleting(true)
+      setDeleteError('')
+      await deleteApplication(selectedApplication.id)
+      setApplications((current) => current.filter((application) => application.id !== selectedApplication.id))
+      setSelectedId(null)
+      setIsMobileDetailOpen(false)
+    } catch {
+      setDeleteError('La suppression n’a pas été enregistrée. Réessayez.')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -627,7 +743,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               ) : (
                 <>
                   <div className="divide-y divide-[#E7E1D7] lg:hidden">
-                    {filteredApplications.map((application) => (
+                    {paginatedApplications.map((application) => (
                       <MobileApplicationCard
                         key={application.id}
                         application={application}
@@ -655,7 +771,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredApplications.map((application) => {
+                      {paginatedApplications.map((application) => {
                         const isSelected = selectedId === application.id
                         return (
                           <tr
@@ -686,15 +802,55 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 </>
               )}
             </div>
+            {!loadError && !isLoading && filteredApplications.length > 0 && (
+              <nav className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#D4CCBE] bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4" aria-label="Pagination des dossiers">
+                <p className="font-sans text-xs text-[#69756D]">
+                  Dossiers <span className="font-semibold text-[#27322C]">{firstApplicationIndex}–{lastApplicationIndex}</span> sur {filteredApplications.length}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#D4CCBE] text-[#245A43] transition hover:border-[#245A43] disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={currentPage === 1}
+                    aria-label="Page précédente"
+                  >
+                    <ChevronLeft size={17} />
+                  </button>
+                  <div className="flex max-w-full items-center gap-1 overflow-x-auto [scrollbar-width:thin]" aria-label="Choisir une page">
+                    {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                      <button
+                        key={page}
+                        type="button"
+                        aria-current={currentPage === page ? 'page' : undefined}
+                        className={`grid h-9 min-w-9 shrink-0 place-items-center rounded-full px-2 font-sans text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7] ${currentPage === page ? 'bg-[#17201B] text-white' : 'text-[#59665E] hover:bg-[#F0ECE3]'}`}
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#D4CCBE] text-[#245A43] transition hover:border-[#245A43] disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    disabled={currentPage === totalPages}
+                    aria-label="Page suivante"
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </div>
+              </nav>
+            )}
             {selectedApplication && (
               <div className="mt-5 hidden lg:block 2xl:hidden">
-                <DetailPanel application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} isSavingStatus={isSavingStatus} statusError={statusError} />
+                <DetailPanel application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} onDelete={() => setIsDeleteConfirmationOpen(true)} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
               </div>
             )}
           </div>
           {selectedApplication && (
             <div className="hidden 2xl:block">
-              <DetailPanel application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} isSavingStatus={isSavingStatus} statusError={statusError} />
+              <DetailPanel application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} onDelete={() => setIsDeleteConfirmationOpen(true)} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
             </div>
           )}
         </div>
@@ -704,8 +860,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         isOpen={isMobileDetailOpen}
         onClose={() => setIsMobileDetailOpen(false)}
         onStatusChange={(status) => setPendingStatus(status)}
+        onDelete={() => setIsDeleteConfirmationOpen(true)}
         isSavingStatus={isSavingStatus}
+        isDeleting={isDeleting}
         statusError={statusError}
+        deleteError={deleteError}
       />
       {isLogoutConfirmationOpen && (
         <ConfirmationDialog
@@ -728,6 +887,18 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           onConfirm={() => {
             void changeStatus(pendingStatus)
             setPendingStatus(null)
+          }}
+        />
+      )}
+      {isDeleteConfirmationOpen && selectedApplication && (
+        <ConfirmationDialog
+          title="Supprimer définitivement ce dossier ?"
+          description={`Le dossier de ${selectedApplication.firstName} ${selectedApplication.lastName} et toutes ses pièces jointes seront supprimés définitivement.`}
+          confirmLabel="Supprimer"
+          onCancel={() => setIsDeleteConfirmationOpen(false)}
+          onConfirm={() => {
+            setIsDeleteConfirmationOpen(false)
+            void removeApplication()
           }}
         />
       )}

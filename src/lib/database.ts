@@ -176,6 +176,36 @@ export async function setApplicationStatus(
   }
 }
 
+export async function deleteApplication(id: string): Promise<void> {
+  const supabase = getSupabaseClient()
+  const { publishableKey, deleteApplicationFunction } = getSupabaseConfig()
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    throw new ApplicationServiceError('Votre session administrateur a expiré.')
+  }
+
+  let response: Response
+  try {
+    response = await fetch(getFunctionUrl(deleteApplicationFunction), {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: publishableKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ applicationId: id }),
+      credentials: 'omit',
+    })
+  } catch {
+    throw new ApplicationServiceError('La suppression du dossier est indisponible.')
+  }
+
+  if (!response.ok) {
+    throw new ApplicationServiceError('La suppression du dossier a échoué.')
+  }
+}
+
 export async function getDocumentSignedUrl(documentFile: StoredDocument): Promise<string> {
   const supabase = getSupabaseClient()
   const { data, error } = await supabase.storage

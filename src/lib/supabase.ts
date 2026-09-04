@@ -5,10 +5,12 @@ type SupabaseConfig = {
   publishableKey: string
   submitFunction: string
   documentsFunction: string
+  deleteApplicationFunction: string
 }
 
 const defaultSubmitFunction = 'submit-application'
 const defaultDocumentsFunction = 'admin-application-document'
+const defaultDeleteApplicationFunction = 'admin-delete-application'
 
 let client: SupabaseClient | undefined
 
@@ -54,6 +56,7 @@ export const getSupabaseConfig = (): SupabaseConfig => {
       publishableKey,
       submitFunction: getFunctionName(import.meta.env.VITE_SUPABASE_SUBMIT_FUNCTION, defaultSubmitFunction),
       documentsFunction: getFunctionName(import.meta.env.VITE_SUPABASE_DOCUMENTS_FUNCTION, defaultDocumentsFunction),
+      deleteApplicationFunction: getFunctionName(import.meta.env.VITE_SUPABASE_DELETE_APPLICATION_FUNCTION, defaultDeleteApplicationFunction),
     }
   } catch (error) {
     if (error instanceof SupabaseConfigurationError) throw error
