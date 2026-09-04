@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, KeyRound, LoaderCircle, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound, LoaderCircle, ShieldCheck } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { getCurrentAdmin, getSupabaseClient, isSupabaseConfigured, signInAdministrator, signOutAdministrator } from '../lib/supabase'
@@ -10,6 +10,7 @@ export function AdminGate() {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [accessCode, setAccessCode] = useState('')
   const [password, setPassword] = useState('')
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -79,19 +80,19 @@ export function AdminGate() {
   if (isAuthenticated) return <AdminDashboard onLogout={() => void logout()} />
 
   return (
-    <main className="grid min-h-[100svh] place-items-center overflow-hidden bg-[#17201B] px-4 py-5 sm:px-8 sm:py-8">
-      <span className="pointer-events-none absolute -left-24 top-[-5rem] h-64 w-64 rounded-full border-[30px] border-[#D8FF41]" />
-      <span className="pointer-events-none absolute bottom-14 right-[12%] h-4 w-4 rounded-full bg-[#FFCE9B]" />
-      <section className="relative w-full max-w-md rounded-[1.75rem] border border-white/15 bg-[#F7F4EE] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.35)] sm:rounded-[2rem] sm:p-9">
+    <main className="relative grid min-h-[100svh] place-items-center overflow-x-hidden bg-[#17201B] px-4 py-5 sm:px-8 sm:py-8">
+      <span aria-hidden="true" className="pointer-events-none absolute -left-20 -top-16 h-48 w-48 rounded-full border-[22px] border-[#D8FF41] sm:-left-24 sm:-top-20 sm:h-64 sm:w-64 sm:border-[30px]" />
+      <span aria-hidden="true" className="pointer-events-none absolute bottom-7 right-5 h-3 w-3 rounded-full bg-[#FFCE9B] sm:bottom-14 sm:right-[12%] sm:h-4 sm:w-4" />
+      <section className="relative w-full max-w-md rounded-[1.5rem] border border-white/15 bg-[#F7F4EE] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.35)] sm:rounded-[2rem] sm:p-9">
         <Link className="inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-[#245A43] hover:text-[#3C56D7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]" to="/">
           <ArrowLeft size={15} /> Retour au formulaire
         </Link>
-        <div className="mt-8"><BrandMark compact /></div>
-        <p className="mt-8 font-sans text-[11px] font-medium uppercase tracking-[0.16em] text-[#3C56D7]">Accès réservé</p>
-        <h1 className="mt-3 font-sans text-4xl font-bold leading-none tracking-[-0.06em] text-[#17201B]">Back-office du club</h1>
-        <p className="mt-5 font-sans text-sm leading-6 text-[#536058]">Saisissez votre code administrateur et votre mot de passe pour consulter les dossiers.</p>
+        <div className="mt-6 sm:mt-8"><BrandMark compact /></div>
+        <p className="mt-7 font-sans text-[10px] font-medium uppercase tracking-[0.16em] text-[#3C56D7] sm:mt-8 sm:text-[11px]">Accès réservé</p>
+        <h1 className="mt-3 font-sans text-[2rem] font-bold leading-[0.95] tracking-[-0.06em] text-[#17201B] sm:text-4xl">Back-office du club</h1>
+        <p className="mt-4 font-sans text-sm leading-6 text-[#536058] sm:mt-5">Saisissez votre code administrateur et votre mot de passe pour consulter les dossiers.</p>
 
-        <form className="mt-8" onSubmit={submit}>
+        <form className="mt-7 sm:mt-8" onSubmit={submit}>
           <label className="block">
             <span className="font-sans text-sm font-semibold text-[#27322C]">Code administrateur</span>
             <span className="relative mt-2 block">
@@ -103,7 +104,17 @@ export function AdminGate() {
             <span className="font-sans text-sm font-semibold text-[#27322C]">Mot de passe</span>
             <span className="relative mt-2 block">
               <KeyRound className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#69756D]" size={18} strokeWidth={1.7} />
-              <input className="w-full rounded-xl border border-[#D4CCBE] bg-white py-3.5 pl-11 pr-4 font-sans text-sm text-[#17201B] outline-none transition placeholder:text-[#9A9F98] focus:border-[#3C56D7] focus:ring-4 focus:ring-[#DDE2FF]" type="password" autoComplete="current-password" value={password} onChange={(event) => { setPassword(event.target.value); setError('') }} placeholder="Saisir le mot de passe" required disabled={isCheckingSession || isSubmitting} />
+              <input className="w-full rounded-xl border border-[#D4CCBE] bg-white py-3.5 pl-11 pr-12 font-sans text-sm text-[#17201B] outline-none transition placeholder:text-[#9A9F98] focus:border-[#3C56D7] focus:ring-4 focus:ring-[#DDE2FF]" type={isPasswordVisible ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => { setPassword(event.target.value); setError('') }} placeholder="Saisir le mot de passe" required disabled={isCheckingSession || isSubmitting} />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-[#69756D] transition hover:bg-[#E7F0EA] hover:text-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7] disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => setIsPasswordVisible((visible) => !visible)}
+                aria-label={isPasswordVisible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                aria-pressed={isPasswordVisible}
+                disabled={isCheckingSession || isSubmitting}
+              >
+                {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </span>
           </label>
           {error && <p className="mt-3 font-sans text-sm font-medium text-[#9F3B22]" role="alert">{error}</p>}

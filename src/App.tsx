@@ -1,8 +1,8 @@
-import { createHashRouter, Navigate, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { AdminGate } from './components/AdminGate'
 import { EnrollmentForm } from './components/EnrollmentForm'
 
-const router = createHashRouter([
+const router = createBrowserRouter([
   {
     path: '/',
     element: <EnrollmentForm />,

@@ -3,7 +3,7 @@
 Application React/Tailwind dédiée au dépôt de dossiers d’adhésion d’Alpha Fight Club.
 
 - `/` : formulaire public unique, sans espace adhérent
-- `/#/admin` : registre administrateur, recherche, statuts, consultation et téléchargement des documents
+- `/admin` : registre administrateur, recherche, statuts, consultation et téléchargement des documents
 - Confirmation de dépôt avec paillettes/confettis
 - Dépôt public via une Edge Function Supabase et pièces enregistrées dans un bucket privé
 
@@ -21,10 +21,10 @@ Le back-office utilise Supabase Auth avec e-mail/mot de passe : créez les compt
 
 ## Important avant une mise en ligne
 
-Déployez les Edge Functions `submit-application` et `admin-application-document` avant d’utiliser l’application. La première accepte le dépôt public `multipart/form-data`; la seconde doit vérifier la session administrateur et retourner une URL signée courte durée pour une pièce donnée.
+Déployez l’Edge Function `submit-application` avant d’utiliser l’application. Elle accepte le dépôt public `multipart/form-data`; l’accès administrateur aux documents repose sur les politiques RLS du bucket privé et sur des URL signées très courtes.
 
 Avant de collecter de vrais dossiers, vérifiez aussi :
 
-- des contrôles de type/taille de fichier côté serveur et antivirus ;
+- des contrôles de type/taille de fichier côté serveur et un antivirus/quarantaine ;
 - une politique RGPD de conservation/suppression, une notice d’information et HTTPS.
 # doc-AFC

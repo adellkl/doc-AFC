@@ -64,6 +64,41 @@ export function requireAllowedOrigin(
   }
 }
 
+/**
+ * CORS is not an authorization boundary: the document endpoint authorizes the
+ * caller with a Supabase session and an `admin_users` lookup.  Its front-end
+ * can therefore be served from a Vercel preview, a custom domain, or a local
+ * port without changing a server-side allow list on every deployment.
+ */
+export function allowAuthenticatedBrowserOrigin(
+  request: Request,
+  allowedMethods: readonly string[] = ["GET", "OPTIONS"],
+): CorsHeaders {
+  const origin = request.headers.get("origin")
+  if (!origin) {
+    throw new HttpError(403, "Request origin is required")
+  }
+
+  let canonicalOrigin: string
+  try {
+    const parsed = new URL(origin)
+    if ((parsed.protocol !== "https:" && parsed.protocol !== "http:") || parsed.origin !== origin) {
+      throw new Error("Origin must be a canonical HTTP origin")
+    }
+    canonicalOrigin = parsed.origin
+  } catch {
+    throw new HttpError(403, "Request origin is not allowed")
+  }
+
+  return {
+    "Access-Control-Allow-Headers": "apikey, authorization, content-type, x-client-info",
+    "Access-Control-Allow-Methods": allowedMethods.join(", "),
+    "Access-Control-Allow-Origin": canonicalOrigin,
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  }
+}
+
 function readAllowedOrigins(): Set<string> {
   const raw = Deno.env.get("ALLOWED_ORIGINS")
   if (!raw) {

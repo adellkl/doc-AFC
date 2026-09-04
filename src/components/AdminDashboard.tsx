@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import JSZip from 'jszip'
 import { getApplications, getDocumentSignedUrl, setApplicationStatus } from '../lib/database'
 import { formatDate, formatDateTime, formatFileSize, statusMeta } from '../lib/format'
 import type { ApplicationRecord, ApplicationStatus, StoredDocument } from '../types'
@@ -55,7 +56,7 @@ const openDocument = async (documentFile: StoredDocument) => {
   previewWindow.document.title = 'Préparation du document…'
 
   try {
-    previewWindow.location.replace(await getDocumentSignedUrl(documentFile.id))
+  previewWindow.location.replace(await getDocumentSignedUrl(documentFile))
   } catch (error) {
     previewWindow.close()
     throw error
@@ -64,13 +65,24 @@ const openDocument = async (documentFile: StoredDocument) => {
 
 const downloadDocument = async (documentFile: StoredDocument) => {
   const anchor = document.createElement('a')
-  anchor.href = await getDocumentSignedUrl(documentFile.id)
+  anchor.href = await getDocumentSignedUrl(documentFile)
   anchor.download = documentFile.name
   anchor.referrerPolicy = 'no-referrer'
   anchor.rel = 'noreferrer'
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
+}
+
+const zipFilename = (application: ApplicationRecord) => {
+  const name = `${application.firstName}-${application.lastName}`
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLocaleLowerCase('fr-FR')
+
+  return `${name || 'dossier'}.zip`
 }
 
 function StatusBadge({ status }: { status: ApplicationStatus }) {
@@ -165,7 +177,7 @@ function ProfileAvatar({ application, size = 'h-9 w-9' }: { application: Applica
 
     if (!profilePhoto) return () => { isCurrent = false }
 
-    void getDocumentSignedUrl(profilePhoto.id)
+    void getDocumentSignedUrl(profilePhoto)
       .then((url) => { if (isCurrent) setPhotoUrl(url) })
       .catch(() => { if (isCurrent) setPhotoUrl(null) })
 
@@ -181,7 +193,17 @@ function ProfileAvatar({ application, size = 'h-9 w-9' }: { application: Applica
   )
 }
 
-function DocumentAction({ label, documentFile }: { label: string; documentFile: StoredDocument }) {
+function DocumentAction({
+  label,
+  documentFile,
+  isSelected,
+  onSelectionChange,
+}: {
+  label: string
+  documentFile: StoredDocument
+  isSelected: boolean
+  onSelectionChange: (selected: boolean) => void
+}) {
   const [pendingAction, setPendingAction] = useState<'open' | 'download' | null>(null)
   const [error, setError] = useState('')
 
@@ -210,8 +232,17 @@ function DocumentAction({ label, documentFile }: { label: string; documentFile: 
   }
 
   return (
-    <article className="rounded-2xl border border-[#D4CCBE] bg-white p-4">
+    <article className={`rounded-2xl border bg-white p-4 transition ${isSelected ? 'border-[#3C56D7] ring-2 ring-[#DDE2FF]' : 'border-[#D4CCBE]'}`}>
       <div className="flex items-start gap-3">
+        <label className="mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(event) => onSelectionChange(event.target.checked)}
+            className="h-4 w-4 rounded border-[#9AA59D] accent-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]"
+            aria-label={`Sélectionner ${label}`}
+          />
+        </label>
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F3F5FF] text-[#3C56D7]">
           <FileText size={19} strokeWidth={1.7} />
         </span>
@@ -255,6 +286,15 @@ function DetailPanel({
   isSavingStatus: boolean
   statusError: string
 }) {
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
+  const [isPreparingDownload, setIsPreparingDownload] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
+
+  useEffect(() => {
+    setSelectedDocumentIds([])
+    setDownloadError('')
+  }, [application?.id])
+
   if (!application) {
     return (
       <aside className="flex min-h-[28rem] items-center justify-center rounded-2xl border border-dashed border-[#BFC8C0] bg-[#F0ECE3] p-7 text-center">
@@ -289,6 +329,39 @@ function DetailPanel({
     downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), `dossier-${application.lastName.toLowerCase()}.txt`)
   }
 
+  const updateSelection = (documentId: string, selected: boolean) => {
+    setSelectedDocumentIds((current) => selected
+      ? [...new Set([...current, documentId])]
+      : current.filter((id) => id !== documentId))
+  }
+
+  const downloadSelection = async () => {
+    const selectedDocuments = attachedDocuments.filter(({ documentFile }) => selectedDocumentIds.includes(documentFile.id))
+    if (selectedDocuments.length === 0) return
+
+    try {
+      setIsPreparingDownload(true)
+      setDownloadError('')
+
+      if (selectedDocuments.length === 1) {
+        await downloadDocument(selectedDocuments[0].documentFile)
+        return
+      }
+
+      const zip = new JSZip()
+      await Promise.all(selectedDocuments.map(async ({ documentFile }) => {
+        const response = await fetch(await getDocumentSignedUrl(documentFile))
+        if (!response.ok) throw new Error('Document unavailable')
+        zip.file(documentFile.name, await response.blob())
+      }))
+      downloadBlob(await zip.generateAsync({ type: 'blob' }), zipFilename(application))
+    } catch {
+      setDownloadError('Le téléchargement groupé est momentanément indisponible. Réessayez dans quelques instants.')
+    } finally {
+      setIsPreparingDownload(false)
+    }
+  }
+
   return (
     <aside className="rounded-2xl border border-[#D4CCBE] bg-[#F7F4EE] p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
@@ -310,10 +383,29 @@ function DetailPanel({
             Fiche .txt <ArrowDownToLine size={13} />
           </button>
         </div>
+        {attachedDocuments.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#EAF0EA] px-3 py-2.5">
+            <label className="inline-flex cursor-pointer items-center gap-2 font-sans text-xs font-semibold text-[#245A43]">
+              <input
+                type="checkbox"
+                checked={selectedDocumentIds.length === attachedDocuments.length}
+                onChange={(event) => setSelectedDocumentIds(event.target.checked ? attachedDocuments.map(({ documentFile }) => documentFile.id) : [])}
+                className="h-4 w-4 rounded border-[#9AA59D] accent-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]"
+              />
+              Tout sélectionner
+            </label>
+            {selectedDocumentIds.length > 0 && (
+              <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#245A43] px-3 py-2 font-sans text-xs font-bold text-white transition hover:bg-[#17201B] disabled:cursor-wait disabled:opacity-60" onClick={() => void downloadSelection()} disabled={isPreparingDownload}>
+                <ArrowDownToLine size={14} />
+                {isPreparingDownload ? 'Préparation…' : selectedDocumentIds.length > 1 ? `Télécharger en ZIP (${selectedDocumentIds.length})` : 'Télécharger la pièce'}
+              </button>
+            )}
+          </div>
+        )}
         <div className="mt-3 grid gap-3">
           {attachedDocuments.length > 0 ? (
             attachedDocuments.map(({ label, documentFile }) => (
-              <DocumentAction key={documentFile.id} label={label} documentFile={documentFile} />
+              <DocumentAction key={documentFile.id} label={label} documentFile={documentFile} isSelected={selectedDocumentIds.includes(documentFile.id)} onSelectionChange={(selected) => updateSelection(documentFile.id, selected)} />
             ))
           ) : (
             <p className="rounded-xl border border-dashed border-[#BFC8C0] px-4 py-3 font-sans text-xs leading-5 text-[#69756D]">
@@ -321,23 +413,31 @@ function DetailPanel({
             </p>
           )}
         </div>
+        {downloadError && <p className="mt-3 font-sans text-xs font-semibold text-[#9F3B22]" role="alert">{downloadError}</p>}
       </div>
 
       <div className="mt-6 border-t border-[#D4CCBE] pt-5">
-        <label className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#69756D]" htmlFor="application-status">
+        <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#69756D]">
           État du dossier
-        </label>
-        <select
-          id="application-status"
-          className="mt-2 w-full rounded-xl border border-[#D4CCBE] bg-white px-3 py-3 font-sans text-sm font-semibold text-[#17201B] outline-none focus:border-[#3C56D7] focus:ring-4 focus:ring-[#DDE2FF]"
-          value={application.status}
-          onChange={(event) => onStatusChange(event.target.value as ApplicationStatus)}
-          disabled={isSavingStatus}
-        >
-          <option value="to_review">À vérifier</option>
-          <option value="complete">Complet</option>
-          <option value="incomplete">À compléter</option>
-        </select>
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="min-h-9 rounded-lg bg-[#245A43] px-3 py-2 font-sans text-xs font-bold text-white transition hover:bg-[#1B4634] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#BBD6C5]"
+            onClick={() => onStatusChange('complete')}
+            disabled={isSavingStatus || application.status === 'complete'}
+          >
+            {application.status === 'complete' ? 'Vérifié' : 'Vérifier'}
+          </button>
+          <button
+            type="button"
+            className="min-h-9 rounded-lg border border-[#E3B95D] bg-[#FFF7E2] px-3 py-2 font-sans text-xs font-bold text-[#845B16] transition hover:bg-[#FCEBC5] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#F9DB9B]"
+            onClick={() => onStatusChange('incomplete')}
+            disabled={isSavingStatus || application.status === 'incomplete'}
+          >
+            À compléter
+          </button>
+        </div>
         {statusError && <p className="mt-2 font-sans text-xs font-semibold text-[#9F3B22]" role="alert">{statusError}</p>}
       </div>
     </aside>
@@ -364,7 +464,7 @@ function MobileDetailSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-[#17201B]/45 p-0 backdrop-blur-[1px] lg:hidden" role="presentation">
       <button type="button" className="absolute inset-0 cursor-default" aria-label="Fermer la fiche" onClick={onClose} />
-      <section className="relative max-h-[92svh] w-full overflow-y-auto rounded-t-[1.8rem] bg-[#F7F4EE] pb-[env(safe-area-inset-bottom)] shadow-[0_-16px_48px_rgba(23,32,27,0.22)]" role="dialog" aria-modal="true" aria-label={`Dossier de ${application.firstName} ${application.lastName}`}>
+      <section className="relative max-h-[92svh] w-full overflow-y-auto rounded-t-[1.8rem] bg-[#F7F4EE] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-16px_48px_rgba(23,32,27,0.22)]" role="dialog" aria-modal="true" aria-label={`Dossier de ${application.firstName} ${application.lastName}`}>
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#D4CCBE] bg-[#F7F4EE]/95 px-5 py-3 backdrop-blur-sm">
           <div>
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.12em] text-[#3C56D7]">Dossier</p>
@@ -429,6 +529,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const completeCount = applications.filter((application) => application.status === 'complete').length
   const incompleteCount = applications.filter((application) => application.status === 'incomplete').length
 
+  const toggleApplication = (applicationId: string) => {
+    setSelectedId((current) => current === applicationId ? null : applicationId)
+  }
+
   const changeStatus = async (status: ApplicationStatus) => {
     if (!selectedApplication || status === selectedApplication.status) return
     try {
@@ -466,14 +570,14 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         </div>
       </aside>
 
-      <section className="px-4 py-6 sm:px-8 sm:py-9 lg:px-10">
+      <section className="min-w-0 px-4 py-6 sm:px-8 sm:py-9 lg:px-10 xl:px-12">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <Link className="inline-flex items-center gap-1.5 font-sans text-xs font-bold text-[#245A43] hover:text-[#3C56D7] xl:hidden" to="/">
               <ArrowLeft size={14} /> Formulaire public
             </Link>
             <p className="mt-3 font-sans text-[10px] font-medium uppercase tracking-[0.16em] text-[#3C56D7] xl:mt-0">Registre — Alpha Fight Club</p>
-            <h1 className="mt-2 font-sans text-4xl font-bold tracking-[-0.065em] text-[#17201B] sm:text-5xl">Dossiers reçus</h1>
+            <h1 className="mt-2 font-sans text-[2.15rem] font-bold leading-none tracking-[-0.065em] text-[#17201B] sm:text-5xl">Dossiers reçus</h1>
           </div>
           <p className="font-sans text-[10px] uppercase tracking-[0.12em] text-[#69756D]">{applications.length} dossier{applications.length !== 1 ? 's' : ''} au total</p>
         </header>
@@ -492,7 +596,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#69756D]" size={17} />
                   <input aria-label="Rechercher un dossier" className="w-full rounded-xl border border-[#D4CCBE] py-2.5 pl-10 pr-3 font-sans text-sm outline-none transition focus:border-[#3C56D7] focus:ring-3 focus:ring-[#DDE2FF]" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un nom…" />
                 </label>
-                <div className="-mx-1 flex snap-x gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:pb-0">
+                <div className="-mx-1 flex snap-x gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:justify-end lg:overflow-visible lg:pb-0">
                   {(Object.keys(filterLabels) as Filter[]).map((item) => (
                     <button key={item} type="button" aria-pressed={filter === item} className={`min-h-11 shrink-0 snap-start rounded-full px-3 py-2 font-sans text-xs font-bold transition active:scale-[0.98] ${filter === item ? 'bg-[#17201B] text-white' : 'text-[#59665E] hover:bg-[#F0ECE3]'}`} onClick={() => setFilter(item)}>
                       {filterLabels[item]}
@@ -528,8 +632,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         key={application.id}
                         application={application}
                         onOpen={() => {
-                          setSelectedId(application.id)
-                          setIsMobileDetailOpen(true)
+                          if (selectedId === application.id) {
+                            setSelectedId(null)
+                            setIsMobileDetailOpen(false)
+                          } else {
+                            setSelectedId(application.id)
+                            setIsMobileDetailOpen(true)
+                          }
                         }}
                       />
                     ))}
@@ -552,7 +661,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <tr
                             key={application.id}
                             className={`cursor-pointer border-b border-[#E7E1D7] transition last:border-0 ${isSelected ? 'bg-[#F3F5FF]' : 'hover:bg-[#FAF8F3]'}`}
-                            onClick={() => setSelectedId(application.id)}
+                            onClick={() => toggleApplication(application.id)}
                           >
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
@@ -564,7 +673,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             <td className="px-4 py-4"><span className="inline-flex items-center gap-1 font-sans text-[10px] text-[#245A43]"><CircleCheckBig size={13} /> {countDocuments(application)} / 3</span></td>
                             <td className="px-4 py-4"><StatusBadge status={application.status} /></td>
                             <td className="px-4 py-4 text-right">
-                              <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#3C56D7] transition hover:bg-[#DDE2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]" onClick={() => setSelectedId(application.id)} aria-label={`Ouvrir le dossier de ${application.firstName} ${application.lastName}`}>
+                              <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#3C56D7] transition hover:bg-[#DDE2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]" onClick={(event) => { event.stopPropagation(); toggleApplication(application.id) }} aria-label={`${isSelected ? 'Fermer' : 'Ouvrir'} le dossier de ${application.firstName} ${application.lastName}`}>
                                 <ChevronRight size={18} />
                               </button>
                             </td>

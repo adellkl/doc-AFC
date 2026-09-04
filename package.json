@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/supabase-js": "2.114.0",
     "canvas-confetti": "^1.9.3",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

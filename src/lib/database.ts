@@ -176,38 +176,18 @@ export async function setApplicationStatus(
   }
 }
 
-export async function getDocumentSignedUrl(documentId: string): Promise<string> {
+export async function getDocumentSignedUrl(documentFile: StoredDocument): Promise<string> {
   const supabase = getSupabaseClient()
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  const { data, error } = await supabase.storage
+    .from('application-documents')
+    .createSignedUrl(documentFile.storagePath, 60)
 
-  if (sessionError || !sessionData.session?.access_token) {
-    throw new ApplicationServiceError('Votre session a expiré. Connectez-vous à nouveau.')
-  }
-
-  const { publishableKey, documentsFunction } = getSupabaseConfig()
-  let response: Response
-
-  try {
-    response = await fetch(`${getFunctionUrl(documentsFunction)}?${new URLSearchParams({ documentId })}`, {
-      method: 'GET',
-      headers: {
-        apikey: publishableKey,
-        Authorization: `Bearer ${sessionData.session.access_token}`,
-      },
-      credentials: 'omit',
-      cache: 'no-store',
-    })
-  } catch {
-    throw new ApplicationServiceError('Le lien sécurisé du document est indisponible.')
-  }
-
-  const payload = await parseJson(response)
-  if (!response.ok || !payload || typeof payload !== 'object' || !('signedUrl' in payload) || typeof payload.signedUrl !== 'string') {
+  if (error || !data?.signedUrl) {
     throw new ApplicationServiceError('Le lien sécurisé du document est indisponible.')
   }
 
   try {
-    const signedUrl = new URL(payload.signedUrl)
+    const signedUrl = new URL(data.signedUrl)
     if (!['https:', 'http:'].includes(signedUrl.protocol)) throw new Error('Unsupported protocol')
     return signedUrl.toString()
   } catch {

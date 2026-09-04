@@ -3,10 +3,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.95.3"
 import {
   HttpError,
+  allowAuthenticatedBrowserOrigin,
   createServiceRoleClient,
   isUuid,
   jsonResponse,
-  requireAllowedOrigin,
   requireAuthenticatedUserId,
 } from "../_shared/security.ts"
 
@@ -17,7 +17,7 @@ Deno.serve(async (request) => {
   let corsHeaders: Record<string, string> = {}
 
   try {
-    corsHeaders = requireAllowedOrigin(request, ["GET", "OPTIONS"])
+    corsHeaders = allowAuthenticatedBrowserOrigin(request, ["GET", "OPTIONS"])
 
     if (request.method === "OPTIONS") {
       return new Response(null, {

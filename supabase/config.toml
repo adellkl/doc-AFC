@@ -14,7 +14,9 @@ entrypoint = "./functions/submit-application/index.ts"
 
 [functions.admin-application-document]
 enabled = true
-verify_jwt = true
+# The handler validates the user JWT with Auth and checks public.admin_users.
+# This avoids the legacy gateway verifier while keeping document access private.
+verify_jwt = false
 import_map = "./functions/admin-application-document/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
