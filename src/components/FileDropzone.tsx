@@ -1,4 +1,4 @@
-import { FileCheck2, Trash2, Upload } from 'lucide-react'
+import { Camera, FileCheck2, ImageUp, Trash2, Upload } from 'lucide-react'
 import { useId, useRef, useState, type DragEvent } from 'react'
 import { formatFileSize } from '../lib/format'
 
@@ -22,6 +22,7 @@ export function FileDropzone({ label, description, file, onChange, acceptImagesO
   const helpId = useId()
   const errorId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState('')
 
@@ -63,13 +64,23 @@ export function FileDropzone({ label, description, file, onChange, acceptImagesO
         className="sr-only"
         type="file"
         accept={acceptImagesOnly ? 'image/jpeg,image/png,.jpg,.jpeg,.png' : 'application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png'}
-        capture={acceptImagesOnly ? 'environment' : undefined}
         aria-label={label}
         aria-describedby={`${helpId} ${error ? errorId : ''}`}
         aria-invalid={Boolean(error)}
         tabIndex={-1}
         onChange={(event) => validateAndSetFile(event.target.files?.item(0) ?? undefined)}
       />
+      {acceptImagesOnly && (
+        <input
+          ref={cameraInputRef}
+          className="sr-only"
+          type="file"
+          accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+          capture="environment"
+          tabIndex={-1}
+          onChange={(event) => validateAndSetFile(event.target.files?.item(0) ?? undefined)}
+        />
+      )}
 
       {file ? (
         <div className="relative flex min-h-24 items-center gap-3 overflow-hidden rounded-[1.1rem] border border-[#A2CDB5] bg-[#F7FFF8] px-4 py-3 shadow-[0_8px_20px_rgba(36,90,67,0.07)] sm:min-h-24 sm:px-5">
@@ -115,11 +126,32 @@ export function FileDropzone({ label, description, file, onChange, acceptImagesO
           onDrop={onDrop}
         >
           <span className="absolute right-0 top-0 h-8 w-8 border-b border-l border-[#D4CCBE] bg-[#F7F4EE]" />
-          <button
-            type="button"
-            className="flex min-h-24 w-full items-center gap-3 rounded-[0.85rem] px-4 py-3 text-left outline-none transition-colors active:bg-[#F3F5FF] focus-visible:ring-2 focus-visible:ring-[#3C56D7] sm:min-h-24 sm:px-5"
-            onClick={() => inputRef.current?.click()}
-          >
+          {acceptImagesOnly ? (
+            <div className="flex min-h-28 items-center gap-3 rounded-[0.85rem] px-4 py-3 sm:px-5">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#D4CCBE] bg-[#F7F4EE] text-[#245A43]">
+                <Camera size={18} strokeWidth={1.7} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="block font-sans text-sm font-semibold text-[#17201B]">{label}</span>
+                <span id={helpId} className="mt-1 block font-sans text-[11px] leading-relaxed text-[#69756D]">
+                  {description}
+                </span>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#245A43] px-3 py-2 font-sans text-xs font-bold text-white transition hover:bg-[#17201B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]" onClick={() => cameraInputRef.current?.click()}>
+                    <Camera size={14} /> Prendre une photo
+                  </button>
+                  <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#D4CCBE] px-3 py-2 font-sans text-xs font-bold text-[#245A43] transition hover:border-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]" onClick={() => inputRef.current?.click()}>
+                    <ImageUp size={14} /> Télécharger une photo
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="flex min-h-24 w-full items-center gap-3 rounded-[0.85rem] px-4 py-3 text-left outline-none transition-colors active:bg-[#F3F5FF] focus-visible:ring-2 focus-visible:ring-[#3C56D7] sm:min-h-24 sm:px-5"
+              onClick={() => inputRef.current?.click()}
+            >
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#D4CCBE] bg-[#F7F4EE] text-[#245A43] transition-colors group-hover:bg-[#E5F3E9]">
               <Upload size={18} strokeWidth={1.7} />
             </span>
@@ -133,7 +165,8 @@ export function FileDropzone({ label, description, file, onChange, acceptImagesO
                 <span className="hidden sm:inline">Parcourir mes fichiers</span>
               </span>
             </span>
-          </button>
+            </button>
+          )}
         </div>
       )}
 

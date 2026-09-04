@@ -92,7 +92,7 @@ const zipFilename = (application: ApplicationRecord) => {
 function StatusBadge({ status }: { status: ApplicationStatus }) {
   const meta = statusMeta[status]
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 font-sans text-[10px] font-medium uppercase tracking-[0.08em] ${meta.className}`}>
+    <span className={`inline-flex shrink-0 whitespace-nowrap items-center rounded-full border px-2.5 py-1 font-sans text-[10px] font-medium uppercase tracking-[0.08em] ${meta.className}`}>
       {meta.label}
     </span>
   )
@@ -199,12 +199,10 @@ function ProfileAvatar({ application, size = 'h-9 w-9' }: { application: Applica
 
 function ProfilePhotoPreview({
   documentFile,
-  isSelected,
-  onSelectionChange,
+  compact = false,
 }: {
   documentFile: StoredDocument
-  isSelected: boolean
-  onSelectionChange: (selected: boolean) => void
+  compact?: boolean
 }) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
 
@@ -217,24 +215,20 @@ function ProfilePhotoPreview({
   }, [documentFile])
 
   return (
-    <section className={`relative mt-5 aspect-[16/10] overflow-hidden rounded-2xl bg-[#17201B] transition ${isSelected ? 'ring-2 ring-[#3C56D7] ring-offset-2 ring-offset-[#F7F4EE]' : ''}`}>
+    <section className={`relative shrink-0 overflow-hidden rounded-2xl bg-[#17201B] ${compact ? 'h-20 w-16 sm:h-24 sm:w-[4.5rem]' : 'mt-5'}`}>
       <p className="sr-only">Photo de profil — {documentFile.name}, {formatFileSize(documentFile.size)}</p>
-      <div className="grid h-full w-full place-items-center">
+      <div className={`grid w-full place-items-center ${compact ? 'h-full' : 'h-56 sm:h-64'}`}>
         {photoUrl ? (
-          <img className="h-full w-full object-cover object-center" src={photoUrl} alt="Photo de profil de l’adhérent" />
+          <img
+            className={`block object-contain object-center ${compact ? 'h-full w-full' : ''}`}
+            src={photoUrl}
+            alt="Photo de profil de l’adhérent"
+            style={compact ? undefined : { width: 'auto', height: 'auto', maxWidth: '78%', maxHeight: '78%' }}
+          />
         ) : (
           <span className="font-sans text-xs text-[#69756D]">Chargement de la photo…</span>
         )}
       </div>
-      <label className="absolute right-3 top-3 grid h-9 w-9 cursor-pointer place-items-center rounded-full bg-white/90 shadow-sm backdrop-blur focus-within:ring-2 focus-within:ring-[#3C56D7]">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={(event) => onSelectionChange(event.target.checked)}
-          className="h-4 w-4 rounded border-[#9AA59D] accent-[#245A43]"
-          aria-label="Sélectionner la photo de profil"
-        />
-      </label>
     </section>
   )
 }
@@ -421,11 +415,19 @@ function DetailPanel({
   return (
     <aside className="min-w-0 overflow-hidden rounded-2xl border border-[#D4CCBE] bg-[#F7F4EE] p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#3C56D7]">Dossier sélectionné</p>
-          <h2 className="mt-2 font-sans text-3xl font-bold tracking-[-0.06em] text-[#17201B]">
-            {application.firstName} {application.lastName}
-          </h2>
+        <div className="flex min-w-0 items-start gap-3">
+          {profilePhoto && (
+            <ProfilePhotoPreview
+              compact
+              documentFile={profilePhoto}
+            />
+          )}
+          <div className="min-w-0">
+            <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#3C56D7]">Dossier sélectionné</p>
+            <h2 className="mt-2 font-sans text-3xl font-bold tracking-[-0.06em] text-[#17201B]">
+              {application.firstName} {application.lastName}
+            </h2>
+          </div>
         </div>
         <StatusBadge status={application.status} />
       </div>
@@ -457,13 +459,6 @@ function DetailPanel({
               </button>
             )}
           </div>
-        )}
-        {profilePhoto && (
-          <ProfilePhotoPreview
-            documentFile={profilePhoto}
-            isSelected={selectedDocumentIds.includes(profilePhoto.id)}
-            onSelectionChange={(selected) => updateSelection(profilePhoto.id, selected)}
-          />
         )}
         <div className="mt-3 grid gap-3">
           {attachedDocuments.length > 0 ? (
