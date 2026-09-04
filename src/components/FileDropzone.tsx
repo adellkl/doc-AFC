@@ -63,6 +63,7 @@ export function FileDropzone({ label, description, file, onChange, acceptImagesO
         className="sr-only"
         type="file"
         accept={acceptImagesOnly ? 'image/jpeg,image/png,.jpg,.jpeg,.png' : 'application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png'}
+        capture={acceptImagesOnly ? 'environment' : undefined}
         aria-label={label}
         aria-describedby={`${helpId} ${error ? errorId : ''}`}
         aria-invalid={Boolean(error)}

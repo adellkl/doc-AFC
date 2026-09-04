@@ -80,7 +80,7 @@ export function AdminGate() {
   if (isAuthenticated) return <AdminDashboard onLogout={() => void logout()} />
 
   return (
-    <main className="relative grid min-h-[100svh] place-items-center overflow-x-hidden bg-[#17201B] px-4 py-5 sm:px-8 sm:py-8">
+    <main className="relative grid h-[100svh] min-h-0 place-items-center overflow-hidden bg-[#17201B] px-4 py-5 sm:px-8 sm:py-8">
       <span aria-hidden="true" className="pointer-events-none absolute -left-20 -top-16 h-48 w-48 rounded-full border-[22px] border-[#D8FF41] sm:-left-24 sm:-top-20 sm:h-64 sm:w-64 sm:border-[30px]" />
       <span aria-hidden="true" className="pointer-events-none absolute bottom-7 right-5 h-3 w-3 rounded-full bg-[#FFCE9B] sm:bottom-14 sm:right-[12%] sm:h-4 sm:w-4" />
       <section className="relative w-full max-w-md rounded-[1.5rem] border border-white/15 bg-[#F7F4EE] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.35)] sm:rounded-[2rem] sm:p-9">

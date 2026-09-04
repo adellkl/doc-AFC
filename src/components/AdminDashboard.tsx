@@ -217,7 +217,7 @@ function ProfilePhotoPreview({
   }, [documentFile])
 
   return (
-    <section className={`relative mt-5 aspect-[4/3] overflow-hidden rounded-2xl bg-[#17201B] transition ${isSelected ? 'ring-2 ring-[#3C56D7] ring-offset-2 ring-offset-[#F7F4EE]' : ''}`}>
+    <section className={`relative mt-5 aspect-[16/10] overflow-hidden rounded-2xl bg-[#17201B] transition ${isSelected ? 'ring-2 ring-[#3C56D7] ring-offset-2 ring-offset-[#F7F4EE]' : ''}`}>
       <p className="sr-only">Photo de profil — {documentFile.name}, {formatFileSize(documentFile.size)}</p>
       <div className="grid h-full w-full place-items-center">
         {photoUrl ? (
@@ -712,9 +712,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#69756D]" size={17} />
                   <input aria-label="Rechercher un dossier" className="w-full rounded-xl border border-[#D4CCBE] py-2.5 pl-10 pr-3 font-sans text-sm outline-none transition focus:border-[#3C56D7] focus:ring-3 focus:ring-[#DDE2FF]" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un nom…" />
                 </label>
-                <div className="-mx-1 flex snap-x gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:justify-end lg:overflow-visible lg:pb-0">
+                <div className="grid grid-cols-4 gap-0.5 sm:flex sm:flex-wrap sm:justify-end lg:mx-0">
                   {(Object.keys(filterLabels) as Filter[]).map((item) => (
-                    <button key={item} type="button" aria-pressed={filter === item} className={`min-h-11 shrink-0 snap-start rounded-full px-3 py-2 font-sans text-xs font-bold transition active:scale-[0.98] ${filter === item ? 'bg-[#17201B] text-white' : 'text-[#59665E] hover:bg-[#F0ECE3]'}`} onClick={() => setFilter(item)}>
+                    <button key={item} type="button" aria-pressed={filter === item} className={`min-h-9 w-full whitespace-nowrap rounded-full px-0 py-1.5 font-sans text-[9px] font-bold leading-none tracking-[-0.05em] transition active:scale-[0.98] sm:min-h-11 sm:w-auto sm:px-3 sm:py-2 sm:text-xs sm:tracking-normal ${filter === item ? 'bg-[#17201B] text-white' : 'text-[#59665E] hover:bg-[#F0ECE3]'}`} onClick={() => setFilter(item)}>
                       {filterLabels[item]}
                     </button>
                   ))}

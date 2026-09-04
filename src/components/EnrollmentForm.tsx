@@ -143,6 +143,16 @@ export function EnrollmentForm() {
   const [formError, setFormError] = useState('')
   const [submittedRecord, setSubmittedRecord] = useState<SubmittedApplication | null>(null)
 
+  useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration
+    }
+  }, [])
+
   const updateValue = (field: keyof FormValues) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setValues((current) => ({ ...current, [field]: event.target.value }))
   }
