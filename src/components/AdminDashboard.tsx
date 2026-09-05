@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import JSZip from 'jszip'
 import { deleteApplication, getApplications, getDocumentSignedUrl, setApplicationStatus } from '../lib/database'
@@ -138,10 +139,10 @@ function StatCard({ value, label, colour }: { value: number; label: string; colo
   }[colour]
 
   return (
-    <div className="rounded-2xl border border-[#D4CCBE] bg-white px-3 py-3 sm:px-5 sm:py-4">
-      <span className={`block h-2 w-2 rounded-full ${dot}`} />
-      <p className="mt-3 font-sans text-2xl font-bold tracking-[-0.06em] text-[#17201B] sm:mt-4 sm:text-3xl">{value}</p>
-      <p className="mt-1 font-sans text-[8px] font-medium uppercase tracking-[0.08em] text-[#69756D] sm:text-[10px] sm:tracking-[0.12em]">{label}</p>
+    <div className="rounded-2xl border border-[#D4CCBE] bg-white px-3 py-3 sm:px-5 sm:py-4 2xl:w-36 2xl:rounded-xl 2xl:px-3 2xl:py-2">
+      <span className={`block h-2 w-2 rounded-full 2xl:h-1.5 2xl:w-1.5 ${dot}`} />
+      <p className="mt-3 font-sans text-2xl font-bold tracking-[-0.06em] text-[#17201B] sm:mt-4 sm:text-3xl 2xl:mt-1.5 2xl:text-xl">{value}</p>
+      <p className="mt-1 font-sans text-[8px] font-medium uppercase tracking-[0.08em] text-[#69756D] sm:text-[10px] sm:tracking-[0.12em] 2xl:mt-0.5 2xl:text-[8px] 2xl:tracking-[0.08em]">{label}</p>
     </div>
   )
 }
@@ -200,9 +201,11 @@ function ProfileAvatar({ application, size = 'h-9 w-9' }: { application: Applica
 function ProfilePhotoPreview({
   documentFile,
   compact = false,
+  onExpand,
 }: {
   documentFile: StoredDocument
   compact?: boolean
+  onExpand?: () => void
 }) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
 
@@ -215,12 +218,18 @@ function ProfilePhotoPreview({
   }, [documentFile])
 
   return (
-    <section className={`relative shrink-0 overflow-hidden rounded-2xl bg-[#17201B] ${compact ? 'h-20 w-16 sm:h-24 sm:w-[4.5rem]' : 'mt-5'}`}>
-      <p className="sr-only">Photo de profil — {documentFile.name}, {formatFileSize(documentFile.size)}</p>
-      <div className={`grid w-full place-items-center ${compact ? 'h-full' : 'h-56 sm:h-64'}`}>
+    <section className={`relative shrink-0 overflow-hidden rounded-2xl bg-[#17201B] ${compact ? 'h-16 w-12 sm:h-20 sm:w-16 2xl:h-16 2xl:w-12' : 'mt-5'}`}>
+      <button
+        type="button"
+        onClick={onExpand}
+        className={`group block w-full text-left ${compact ? 'h-full cursor-zoom-in' : ''} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#AEB9FF]`}
+        aria-label={`Agrandir la photo de profil — ${documentFile.name}`}
+      >
+        <p className="sr-only">Photo de profil — {documentFile.name}, {formatFileSize(documentFile.size)}</p>
+        <div className={`grid w-full place-items-center ${compact ? 'h-full' : 'h-56 sm:h-64'}`}>
         {photoUrl ? (
           <img
-            className={`block object-contain object-center ${compact ? 'h-full w-full' : ''}`}
+            className={`block object-contain object-center transition duration-200 group-hover:scale-[1.03] ${compact ? 'h-full w-full' : ''}`}
             src={photoUrl}
             alt="Photo de profil de l’adhérent"
             style={compact ? undefined : { width: 'auto', height: 'auto', maxWidth: '78%', maxHeight: '78%' }}
@@ -228,8 +237,56 @@ function ProfilePhotoPreview({
         ) : (
           <span className="font-sans text-xs text-[#69756D]">Chargement de la photo…</span>
         )}
-      </div>
+        </div>
+      </button>
     </section>
+  )
+}
+
+function ProfilePhotoDialog({
+  documentFile,
+  onClose,
+}: {
+  documentFile: StoredDocument
+  onClose: () => void
+}) {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isCurrent = true
+    void getDocumentSignedUrl(documentFile)
+      .then((url) => { if (isCurrent) setPhotoUrl(url) })
+      .catch(() => { if (isCurrent) setPhotoUrl(null) })
+    return () => { isCurrent = false }
+  }, [documentFile])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  return createPortal(
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-[#17201B]/75 p-4 backdrop-blur-sm max-md:p-0" role="presentation" onMouseDown={onClose}>
+      <section className="relative flex max-h-[calc(100svh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-[#17201B] shadow-[0_24px_72px_rgba(0,0,0,0.45)] max-md:h-[100svh] max-md:max-h-none max-md:max-w-none max-md:rounded-none" role="dialog" aria-modal="true" aria-label="Photo de profil agrandie" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between gap-4 border-b border-white/15 px-4 py-3 sm:px-5 max-md:absolute max-md:inset-x-0 max-md:top-0 max-md:z-10 max-md:border-0 max-md:bg-gradient-to-b max-md:from-black/70 max-md:to-transparent">
+          <p className="truncate font-sans text-sm font-semibold text-white">{documentFile.name}</p>
+          <button type="button" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#AEB9FF]" onClick={onClose} aria-label="Fermer l’aperçu">
+            <X size={21} />
+          </button>
+        </div>
+        <div className="grid min-h-0 flex-1 place-items-center p-4 sm:p-6 max-md:h-[100svh] max-md:p-0">
+          {photoUrl ? (
+            <img className="max-h-[calc(100svh-9rem)] max-w-full object-contain max-md:max-h-[100svh]" src={photoUrl} alt="Photo de profil de l’adhérent agrandie" />
+          ) : (
+            <span className="font-sans text-sm text-white/70">Chargement de la photo…</span>
+          )}
+        </div>
+      </section>
+    </div>,
+    document.body,
   )
 }
 
@@ -272,8 +329,8 @@ function DocumentAction({
   }
 
   return (
-    <article className={`min-w-0 overflow-hidden rounded-2xl border bg-white p-4 transition ${isSelected ? 'border-[#3C56D7] ring-2 ring-[#DDE2FF]' : 'border-[#D4CCBE]'}`}>
-      <div className="flex items-start gap-3">
+    <article className={`min-w-0 overflow-hidden rounded-2xl border bg-white p-3 transition 2xl:flex 2xl:flex-wrap 2xl:items-center 2xl:gap-2 ${isSelected ? 'border-[#3C56D7] ring-2 ring-[#DDE2FF]' : 'border-[#D4CCBE]'}`}>
+      <div className="flex min-w-0 flex-1 items-start gap-3 2xl:items-center 2xl:gap-2">
         <label className="mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center">
           <input
             type="checkbox"
@@ -283,7 +340,7 @@ function DocumentAction({
             aria-label={`Sélectionner ${label}`}
           />
         </label>
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F3F5FF] text-[#3C56D7]">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F3F5FF] text-[#3C56D7] 2xl:h-9 2xl:w-9">
           <FileText size={19} strokeWidth={1.7} />
         </span>
         <div className="min-w-0 flex-1">
@@ -292,25 +349,29 @@ function DocumentAction({
           <p className="mt-1 font-sans text-[10px] text-[#69756D]">{formatFileSize(documentFile.size)}</p>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-1 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 2xl:mt-0 2xl:flex 2xl:shrink-0">
         <button
           type="button"
-          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#D4CCBE] px-3 py-2.5 font-sans text-xs font-bold text-[#245A43] transition hover:border-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7] disabled:cursor-wait disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#D4CCBE] px-3 py-2.5 font-sans text-xs font-bold text-[#245A43] transition hover:border-[#245A43] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7] disabled:cursor-wait disabled:opacity-60 2xl:h-9 2xl:w-9 2xl:px-0 2xl:py-0"
           onClick={() => void handleOpen()}
           disabled={pendingAction !== null}
+          aria-label={pendingAction === 'open' ? 'Ouverture du document' : `Ouvrir ${label}`}
+          title={`Ouvrir ${label}`}
         >
-          {pendingAction === 'open' ? 'Ouverture…' : 'Ouvrir'} <ExternalLink size={14} />
+          <span className="2xl:sr-only">{pendingAction === 'open' ? 'Ouverture…' : 'Ouvrir'}</span> <ExternalLink size={14} />
         </button>
         <button
           type="button"
-          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#245A43] px-3 py-2.5 font-sans text-xs font-bold text-white transition hover:bg-[#17201B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7] disabled:cursor-wait disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#245A43] px-3 py-2.5 font-sans text-xs font-bold text-white transition hover:bg-[#17201B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7] disabled:cursor-wait disabled:opacity-60 2xl:h-9 2xl:w-9 2xl:px-0 2xl:py-0"
           onClick={() => void handleDownload()}
           disabled={pendingAction !== null}
+          aria-label={pendingAction === 'download' ? 'Préparation du téléchargement' : `Télécharger ${label}`}
+          title={`Télécharger ${label}`}
         >
-          {pendingAction === 'download' ? 'Préparation…' : 'Télécharger'} <ArrowDownToLine size={14} />
+          <span className="2xl:sr-only">{pendingAction === 'download' ? 'Préparation…' : 'Télécharger'}</span> <ArrowDownToLine size={14} />
         </button>
       </div>
-      {error && <p className="mt-3 font-sans text-xs font-semibold text-[#9F3B22]" role="alert">{error}</p>}
+      {error && <p className="mt-3 font-sans text-xs font-semibold text-[#9F3B22] 2xl:mt-0 2xl:basis-full" role="alert">{error}</p>}
     </article>
   )
 }
@@ -335,10 +396,12 @@ function DetailPanel({
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
   const [isPreparingDownload, setIsPreparingDownload] = useState(false)
   const [downloadError, setDownloadError] = useState('')
+  const [isProfilePhotoOpen, setIsProfilePhotoOpen] = useState(false)
 
   useEffect(() => {
     setSelectedDocumentIds([])
     setDownloadError('')
+    setIsProfilePhotoOpen(false)
   }, [application?.id])
 
   if (!application) {
@@ -362,22 +425,6 @@ function DetailPanel({
     ...(profilePhoto ? [{ label: 'Photo de profil', documentFile: profilePhoto }] : []),
     ...attachedDocuments,
   ]
-
-  const downloadSummary = () => {
-    const text = [
-      'ALPHA FIGHT CLUB — DOSSIER D’ADHÉSION',
-      '',
-      `Nom : ${application.firstName} ${application.lastName}`,
-      `Reçu le : ${formatDateTime(application.createdAt)}`,
-      `État : ${statusMeta[application.status].label}`,
-      '',
-      `Pièce d’identité : ${application.documents.identityCard?.name ?? 'Non reçue'}`,
-      `Certificat médical : ${application.documents.medicalCertificate?.name ?? 'Non reçu'}`,
-      `Photo de profil : ${application.documents.profilePhoto?.name ?? 'Non reçue'}`,
-    ].join('\n')
-
-    downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), `dossier-${application.lastName.toLowerCase()}.txt`)
-  }
 
   const updateSelection = (documentId: string, selected: boolean) => {
     setSelectedDocumentIds((current) => selected
@@ -413,18 +460,19 @@ function DetailPanel({
   }
 
   return (
-    <aside className="min-w-0 overflow-hidden rounded-2xl border border-[#D4CCBE] bg-[#F7F4EE] p-5 sm:p-6">
+    <aside className="min-w-0 overflow-hidden rounded-2xl border border-[#D4CCBE] bg-[#F7F4EE] p-4 sm:p-5 2xl:p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           {profilePhoto && (
             <ProfilePhotoPreview
               compact
               documentFile={profilePhoto}
+              onExpand={() => setIsProfilePhotoOpen(true)}
             />
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 max-lg:hidden">
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#3C56D7]">Dossier sélectionné</p>
-            <h2 className="mt-2 font-sans text-3xl font-bold tracking-[-0.06em] text-[#17201B]">
+            <h2 className="mt-2 font-sans text-3xl font-bold tracking-[-0.06em] text-[#17201B] 2xl:mt-1 2xl:text-2xl">
               {application.firstName} {application.lastName}
             </h2>
           </div>
@@ -432,17 +480,12 @@ function DetailPanel({
         <StatusBadge status={application.status} />
       </div>
 
-      <p className="mt-4 font-sans text-[10px] text-[#69756D]">Transmis le {formatDateTime(application.createdAt)}</p>
+      <p className="mt-3 font-sans text-[10px] text-[#69756D] 2xl:mt-2">Transmis le {formatDateTime(application.createdAt)}</p>
 
-      <div className="mt-6">
-        <div className="flex items-center justify-between gap-3">
-          <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#69756D]">Pièces jointes</p>
-          <button type="button" className="inline-flex items-center gap-1 font-sans text-xs font-bold text-[#245A43] hover:text-[#3C56D7]" onClick={downloadSummary}>
-            Fiche .txt <ArrowDownToLine size={13} />
-          </button>
-        </div>
+      <div className="mt-4 2xl:mt-4">
+        <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#69756D]">Pièces jointes</p>
         {selectableDocuments.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#EAF0EA] px-3 py-2.5">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#EAF0EA] px-3 py-2 2xl:mt-2">
             <label className="inline-flex cursor-pointer items-center gap-2 font-sans text-xs font-semibold text-[#245A43]">
               <input
                 type="checkbox"
@@ -453,14 +496,14 @@ function DetailPanel({
               Tout sélectionner
             </label>
             {selectedDocumentIds.length > 0 && (
-              <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#245A43] px-3 py-2 font-sans text-xs font-bold text-white transition hover:bg-[#17201B] disabled:cursor-wait disabled:opacity-60" onClick={() => void downloadSelection()} disabled={isPreparingDownload}>
+              <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#245A43] px-3 py-2 font-sans text-xs font-bold text-white transition hover:bg-[#17201B] disabled:cursor-wait disabled:opacity-60 2xl:w-9 2xl:justify-center 2xl:px-0" onClick={() => void downloadSelection()} disabled={isPreparingDownload} aria-label={isPreparingDownload ? 'Préparation du téléchargement' : 'Télécharger les pièces sélectionnées'} title="Télécharger les pièces sélectionnées">
                 <ArrowDownToLine size={14} />
-                {isPreparingDownload ? 'Préparation…' : selectedDocumentIds.length > 1 ? `Télécharger en ZIP (${selectedDocumentIds.length})` : 'Télécharger la pièce'}
+                <span className="2xl:sr-only">{isPreparingDownload ? 'Préparation…' : selectedDocumentIds.length > 1 ? `Télécharger en ZIP (${selectedDocumentIds.length})` : 'Télécharger la pièce'}</span>
               </button>
             )}
           </div>
         )}
-        <div className="mt-3 grid gap-3">
+        <div className="mt-2 grid gap-2 2xl:mt-2">
           {attachedDocuments.length > 0 ? (
             attachedDocuments.map(({ label, documentFile }) => (
               <DocumentAction key={documentFile.id} label={label} documentFile={documentFile} isSelected={selectedDocumentIds.includes(documentFile.id)} onSelectionChange={(selected) => updateSelection(documentFile.id, selected)} />
@@ -474,41 +517,46 @@ function DetailPanel({
         {downloadError && <p className="mt-3 font-sans text-xs font-semibold text-[#9F3B22]" role="alert">{downloadError}</p>}
       </div>
 
-      <div className="mt-6 border-t border-[#D4CCBE] pt-5">
-        <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#69756D]">
-          État du dossier
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="min-h-9 rounded-lg bg-[#245A43] px-3 py-2 font-sans text-xs font-bold text-white transition hover:bg-[#1B4634] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#BBD6C5]"
-            onClick={() => onStatusChange('complete')}
-            disabled={isSavingStatus || application.status === 'complete'}
-          >
-            {application.status === 'complete' ? 'Vérifié' : 'Vérifier'}
-          </button>
-          <button
-            type="button"
-            className="min-h-9 rounded-lg border border-[#E3B95D] bg-[#FFF7E2] px-3 py-2 font-sans text-xs font-bold text-[#845B16] transition hover:bg-[#FCEBC5] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#F9DB9B]"
-            onClick={() => onStatusChange('incomplete')}
-            disabled={isSavingStatus || application.status === 'incomplete'}
-          >
-            À compléter
-          </button>
+      <div className="mt-4 flex items-end justify-between gap-3 border-t border-[#D4CCBE] pt-4 2xl:pt-3">
+        <div>
+          <p className="font-sans text-[10px] font-medium uppercase tracking-[0.13em] text-[#69756D]">
+            État du dossier
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="min-h-9 rounded-lg bg-[#245A43] px-3 py-2 font-sans text-xs font-bold text-white transition hover:bg-[#1B4634] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#BBD6C5]"
+              onClick={() => onStatusChange('complete')}
+              disabled={isSavingStatus || application.status === 'complete'}
+            >
+              {application.status === 'complete' ? 'Vérifié' : 'Vérifier'}
+            </button>
+            <button
+              type="button"
+              className="min-h-9 rounded-lg border border-[#E3B95D] bg-[#FFF7E2] px-3 py-2 font-sans text-xs font-bold text-[#845B16] transition hover:bg-[#FCEBC5] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#F9DB9B]"
+              onClick={() => onStatusChange('incomplete')}
+              disabled={isSavingStatus || application.status === 'incomplete'}
+            >
+              À compléter
+            </button>
+          </div>
+          {statusError && <p className="mt-2 font-sans text-xs font-semibold text-[#9F3B22]" role="alert">{statusError}</p>}
         </div>
-        {statusError && <p className="mt-2 font-sans text-xs font-semibold text-[#9F3B22]" role="alert">{statusError}</p>}
-      </div>
-      <div className="mt-5 border-t border-[#D4CCBE] pt-5">
+        <div className="mt-0 border-0 pt-0">
         <button
           type="button"
-          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#E8B5A9] bg-[#FFF4F1] px-3 py-2.5 font-sans text-sm font-bold text-[#9F3B22] transition hover:bg-[#FCE4DE] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#F7C9BE]"
+          className="inline-flex h-10 min-h-0 w-10 items-center justify-center gap-2 rounded-xl border border-[#E8B5A9] bg-[#FFF4F1] px-0 py-0 font-sans text-sm font-bold text-[#9F3B22] transition hover:bg-[#FCE4DE] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#F7C9BE] 2xl:h-9 2xl:w-9"
           onClick={onDelete}
           disabled={isDeleting}
+          aria-label={isDeleting ? 'Suppression du dossier' : 'Supprimer le dossier'}
+          title="Supprimer le dossier"
         >
-          <Trash2 size={16} /> {isDeleting ? 'Suppression…' : 'Supprimer le dossier'}
+          <Trash2 size={16} /> <span className="sr-only">{isDeleting ? 'Suppression…' : 'Supprimer le dossier'}</span>
         </button>
         {deleteError && <p className="mt-2 font-sans text-xs font-semibold text-[#9F3B22]" role="alert">{deleteError}</p>}
+        </div>
       </div>
+      {isProfilePhotoOpen && profilePhoto && <ProfilePhotoDialog documentFile={profilePhoto} onClose={() => setIsProfilePhotoOpen(false)} />}
     </aside>
   )
 }
@@ -540,7 +588,7 @@ function MobileDetailSheet({
     <div className="fixed inset-0 z-50 flex items-end bg-[#17201B]/45 p-0 backdrop-blur-[1px] lg:hidden" role="presentation">
       <button type="button" className="absolute inset-0 cursor-default" aria-label="Fermer la fiche" onClick={onClose} />
       <section className="admin-detail-sheet relative max-h-[92svh] w-full overflow-y-auto rounded-t-[1.8rem] bg-[#F7F4EE] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-16px_48px_rgba(23,32,27,0.22)]" role="dialog" aria-modal="true" aria-label={`Dossier de ${application.firstName} ${application.lastName}`}>
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#D4CCBE] bg-[#F7F4EE]/95 px-5 py-3 backdrop-blur-sm">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#D4CCBE] bg-[#F7F4EE]/95 px-4 py-2.5 backdrop-blur-sm">
           <div>
             <p className="font-sans text-[10px] font-medium uppercase tracking-[0.12em] text-[#3C56D7]">Dossier</p>
             <p className="mt-0.5 font-sans text-sm font-bold text-[#17201B]">{application.firstName} {application.lastName}</p>
@@ -549,8 +597,8 @@ function MobileDetailSheet({
             <X size={21} />
           </button>
         </header>
-        <div className="p-4">
-          <DetailPanel application={application} onStatusChange={onStatusChange} onDelete={onDelete} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
+        <div className="p-3 sm:p-4">
+          <DetailPanel key={application.id} application={application} onStatusChange={onStatusChange} onDelete={onDelete} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
         </div>
       </section>
     </div>
@@ -659,7 +707,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   }
 
   return (
-    <main className="min-h-[100svh] bg-[#F7F4EE] xl:grid xl:grid-cols-[14.5rem_minmax(0,1fr)]">
+    <main className="min-h-[100svh] bg-[#F7F4EE] xl:grid xl:grid-cols-[14.5rem_minmax(0,1fr)] 2xl:h-[100svh] 2xl:overflow-hidden">
       <aside className="flex min-h-16 items-center justify-between bg-[#17201B] px-4 py-3 text-[#F7F4EE] sm:px-5 sm:py-4 xl:sticky xl:top-0 xl:h-[100svh] xl:flex-col xl:items-stretch xl:px-5 xl:py-7">
         <BrandMark inverse compact />
         <nav className="hidden xl:mt-16 xl:block">
@@ -681,7 +729,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         </div>
       </aside>
 
-      <section className="min-w-0 px-4 py-6 sm:px-8 sm:py-9 lg:px-10 xl:px-12">
+      <section className="min-w-0 px-4 py-6 sm:px-8 sm:py-9 lg:px-10 xl:px-12 2xl:flex 2xl:h-[100svh] 2xl:flex-col 2xl:overflow-hidden">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <Link className="inline-flex items-center gap-1.5 font-sans text-xs font-bold text-[#245A43] hover:text-[#3C56D7] xl:hidden" to="/">
@@ -693,23 +741,23 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           <p className="font-sans text-[10px] uppercase tracking-[0.12em] text-[#69756D]">{applications.length} dossier{applications.length !== 1 ? 's' : ''} au total</p>
         </header>
 
-        <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-7 sm:gap-4">
+        <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-7 sm:gap-4 2xl:flex 2xl:gap-3">
           <StatCard value={applications.length} label="Reçus" colour="green" />
           <StatCard value={completeCount} label="Complets" colour="blue" />
           <StatCard value={incompleteCount + reviewCount} label="À traiter" colour="apricot" />
         </div>
 
-        <div className="mt-6 grid gap-5 sm:mt-7 2xl:grid-cols-[minmax(0,1fr)_26rem]">
-          <div>
-            <div className="rounded-2xl border border-[#D4CCBE] bg-white p-3 sm:p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <label className="relative block lg:max-w-sm lg:flex-1">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#69756D]" size={17} />
-                  <input aria-label="Rechercher un dossier" className="w-full rounded-xl border border-[#D4CCBE] py-2.5 pl-10 pr-3 font-sans text-sm outline-none transition focus:border-[#3C56D7] focus:ring-3 focus:ring-[#DDE2FF]" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un nom…" />
+        <div className="mt-6 grid gap-5 sm:mt-7 2xl:min-h-0 2xl:flex-1 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+          <div className="2xl:min-h-0 2xl:overflow-y-auto 2xl:pr-2">
+            <div className="rounded-2xl border border-[#D4CCBE] bg-white p-3 sm:p-4 2xl:rounded-xl 2xl:p-2">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between 2xl:gap-2">
+                <label className="relative block lg:max-w-sm lg:flex-1 2xl:max-w-xs">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#69756D] 2xl:left-3" size={17} />
+                  <input aria-label="Rechercher un dossier" className="w-full rounded-xl border border-[#D4CCBE] py-2.5 pl-10 pr-3 font-sans text-sm outline-none transition focus:border-[#3C56D7] focus:ring-3 focus:ring-[#DDE2FF] 2xl:rounded-lg 2xl:py-1.5 2xl:pl-8 2xl:text-xs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un nom…" />
                 </label>
-                <div className="grid grid-cols-4 gap-0.5 sm:flex sm:flex-wrap sm:justify-end lg:mx-0">
+                <div className="grid grid-cols-4 gap-0.5 sm:flex sm:flex-wrap sm:justify-end lg:mx-0 2xl:gap-1">
                   {(Object.keys(filterLabels) as Filter[]).map((item) => (
-                    <button key={item} type="button" aria-pressed={filter === item} className={`min-h-9 w-full whitespace-nowrap rounded-full px-0 py-1.5 font-sans text-[9px] font-bold leading-none tracking-[-0.05em] transition active:scale-[0.98] sm:min-h-11 sm:w-auto sm:px-3 sm:py-2 sm:text-xs sm:tracking-normal ${filter === item ? 'bg-[#17201B] text-white' : 'text-[#59665E] hover:bg-[#F0ECE3]'}`} onClick={() => setFilter(item)}>
+                    <button key={item} type="button" aria-pressed={filter === item} className={`min-h-9 w-full whitespace-nowrap rounded-full px-0 py-1.5 font-sans text-[9px] font-bold leading-none tracking-[-0.05em] transition active:scale-[0.98] sm:min-h-11 sm:w-auto sm:px-3 sm:py-2 sm:text-xs sm:tracking-normal 2xl:min-h-8 2xl:px-2 2xl:py-1 2xl:text-[10px] ${filter === item ? 'bg-[#17201B] text-white' : 'text-[#59665E] hover:bg-[#F0ECE3]'}`} onClick={() => setFilter(item)}>
                       {filterLabels[item]}
                     </button>
                   ))}
@@ -839,13 +887,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             )}
             {selectedApplication && (
               <div className="mt-5 hidden lg:block 2xl:hidden">
-                <DetailPanel application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} onDelete={() => setIsDeleteConfirmationOpen(true)} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
+                <DetailPanel key={selectedApplication.id} application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} onDelete={() => setIsDeleteConfirmationOpen(true)} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
               </div>
             )}
           </div>
           {selectedApplication && (
             <div className="hidden 2xl:block">
-              <DetailPanel application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} onDelete={() => setIsDeleteConfirmationOpen(true)} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
+              <DetailPanel key={selectedApplication.id} application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} onDelete={() => setIsDeleteConfirmationOpen(true)} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
             </div>
           )}
         </div>

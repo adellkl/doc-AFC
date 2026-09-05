@@ -40,6 +40,9 @@ const documentSlotByKind = {
   profile_photo: 'profilePhoto',
 } as const
 
+const signedUrlCache = new Map<string, { expiresAt: number; url: string }>()
+const pendingSignedUrlRequests = new Map<string, Promise<string>>()
+
 const isApplicationStatus = (value: unknown): value is ApplicationStatus =>
   value === 'to_review' || value === 'complete' || value === 'incomplete'
 
@@ -207,20 +210,38 @@ export async function deleteApplication(id: string): Promise<void> {
 }
 
 export async function getDocumentSignedUrl(documentFile: StoredDocument): Promise<string> {
-  const supabase = getSupabaseClient()
-  const { data, error } = await supabase.storage
-    .from('application-documents')
-    .createSignedUrl(documentFile.storagePath, 60)
+  const cacheKey = `${documentFile.id}:${documentFile.storagePath}`
+  const cachedUrl = signedUrlCache.get(cacheKey)
+  if (cachedUrl && cachedUrl.expiresAt > Date.now()) return cachedUrl.url
 
-  if (error || !data?.signedUrl) {
-    throw new ApplicationServiceError('Le lien sécurisé du document est indisponible.')
-  }
+  const pendingRequest = pendingSignedUrlRequests.get(cacheKey)
+  if (pendingRequest) return pendingRequest
 
+  const request = (async () => {
+    const supabase = getSupabaseClient()
+    const { data, error } = await supabase.storage
+      .from('application-documents')
+      .createSignedUrl(documentFile.storagePath, 60)
+
+    if (error || !data?.signedUrl) {
+      throw new ApplicationServiceError('Le lien sécurisé du document est indisponible.')
+    }
+
+    try {
+      const signedUrl = new URL(data.signedUrl)
+      if (!['https:', 'http:'].includes(signedUrl.protocol)) throw new Error('Unsupported protocol')
+      const url = signedUrl.toString()
+      signedUrlCache.set(cacheKey, { url, expiresAt: Date.now() + 50_000 })
+      return url
+    } catch {
+      throw new ApplicationServiceError('Le lien sécurisé du document est invalide.')
+    }
+  })()
+
+  pendingSignedUrlRequests.set(cacheKey, request)
   try {
-    const signedUrl = new URL(data.signedUrl)
-    if (!['https:', 'http:'].includes(signedUrl.protocol)) throw new Error('Unsupported protocol')
-    return signedUrl.toString()
-  } catch {
-    throw new ApplicationServiceError('Le lien sécurisé du document est invalide.')
+    return await request
+  } finally {
+    pendingSignedUrlRequests.delete(cacheKey)
   }
 }
