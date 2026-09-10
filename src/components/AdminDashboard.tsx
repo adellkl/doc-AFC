@@ -707,7 +707,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   }
 
   return (
-    <main className="min-h-[100svh] bg-[#F7F4EE] xl:grid xl:grid-cols-[14.5rem_minmax(0,1fr)] 2xl:h-[100svh] 2xl:overflow-hidden">
+    <main className="min-h-[100svh] bg-[#F7F4EE] xl:grid xl:h-[100svh] xl:grid-cols-[14.5rem_minmax(0,1fr)] xl:overflow-hidden">
       <aside className="flex min-h-16 items-center justify-between bg-[#17201B] px-4 py-3 text-[#F7F4EE] sm:px-5 sm:py-4 xl:sticky xl:top-0 xl:h-[100svh] xl:flex-col xl:items-stretch xl:px-5 xl:py-7">
         <BrandMark inverse compact />
         <nav className="hidden xl:mt-16 xl:block">
@@ -729,7 +729,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         </div>
       </aside>
 
-      <section className="min-w-0 px-4 py-6 sm:px-8 sm:py-9 lg:px-10 xl:px-12 2xl:flex 2xl:h-[100svh] 2xl:flex-col 2xl:overflow-hidden">
+      <section className="min-w-0 px-4 py-6 sm:px-8 sm:py-9 lg:px-10 xl:px-12 xl:flex xl:h-[100svh] xl:flex-col xl:overflow-hidden">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <Link className="inline-flex items-center gap-1.5 font-sans text-xs font-bold text-[#245A43] hover:text-[#3C56D7] xl:hidden" to="/">
@@ -747,8 +747,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           <StatCard value={incompleteCount + reviewCount} label="À traiter" colour="apricot" />
         </div>
 
-        <div className="mt-6 grid gap-5 sm:mt-7 2xl:min-h-0 2xl:flex-1 2xl:grid-cols-[minmax(0,1fr)_26rem]">
-          <div className="2xl:min-h-0 2xl:overflow-y-auto 2xl:pr-2">
+        <div className={`mt-6 grid gap-5 sm:mt-7 xl:min-h-0 xl:flex-1 ${selectedApplication ? 'xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_26rem]' : 'xl:grid-cols-1'}`}>
+          <div className="xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
             <div className="rounded-2xl border border-[#D4CCBE] bg-white p-3 sm:p-4 2xl:rounded-xl 2xl:p-2">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between 2xl:gap-2">
                 <label className="relative block lg:max-w-sm lg:flex-1 2xl:max-w-xs">
@@ -765,7 +765,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               </div>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-[#D4CCBE] bg-white">
+            <div className="mt-4 overflow-hidden rounded-2xl border border-[#D4CCBE] bg-white xl:min-h-0 xl:flex-1 xl:overflow-auto">
               {loadError ? (
                 <div className="px-6 py-12 text-center">
                   <p className="font-sans text-sm font-bold text-[#9F3B22]" role="alert">{loadError}</p>
@@ -802,15 +802,15 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                       />
                     ))}
                   </div>
-                  <div className="hidden overflow-x-auto lg:block">
+                  <div className="hidden overflow-x-auto lg:block xl:overflow-visible">
                     <table className="min-w-[48rem] w-full border-collapse text-left">
                     <thead className="border-b border-[#D4CCBE] bg-[#F7F4EE]">
                       <tr className="font-sans text-[10px] font-medium uppercase tracking-[0.12em] text-[#69756D]">
-                        <th className="px-5 py-4">Adhérent</th>
-                        <th className="px-4 py-4">Reçu le</th>
-                        <th className="px-4 py-4">Pièces</th>
-                        <th className="px-4 py-4">État</th>
-                        <th className="px-4 py-4"><span className="sr-only">Ouvrir</span></th>
+                        <th className="sticky top-0 z-10 border-r border-[#E7E1D7] bg-[#F7F4EE] px-5 py-4 shadow-[0_1px_0_#D4CCBE]">Adhérent</th>
+                        <th className="sticky top-0 z-10 border-r border-[#E7E1D7] bg-[#F7F4EE] px-4 py-4 shadow-[0_1px_0_#D4CCBE]">Reçu le</th>
+                        <th className="sticky top-0 z-10 border-r border-[#E7E1D7] bg-[#F7F4EE] px-4 py-4 shadow-[0_1px_0_#D4CCBE]">Pièces</th>
+                        <th className="sticky top-0 z-10 border-r border-[#E7E1D7] bg-[#F7F4EE] px-4 py-4 shadow-[0_1px_0_#D4CCBE]">État</th>
+                        <th className="sticky top-0 z-10 bg-[#F7F4EE] px-4 py-4 shadow-[0_1px_0_#D4CCBE]"><span className="sr-only">Ouvrir</span></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -822,15 +822,15 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             className={`cursor-pointer border-b border-[#E7E1D7] transition last:border-0 ${isSelected ? 'bg-[#F3F5FF]' : 'hover:bg-[#FAF8F3]'}`}
                             onClick={() => toggleApplication(application.id)}
                           >
-                            <td className="px-5 py-4">
+                            <td className="border-r border-[#EDE8DE] px-5 py-4">
                               <div className="flex items-center gap-3">
                                 <ProfileAvatar application={application} />
                                 <span className="font-sans text-sm font-bold text-[#17201B]">{application.firstName} {application.lastName}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-4 font-sans text-[10px] text-[#69756D]">{formatDate(application.createdAt)}</td>
-                            <td className="px-4 py-4"><span className="inline-flex items-center gap-1 font-sans text-[10px] text-[#245A43]"><CircleCheckBig size={13} /> {countDocuments(application)} / 3</span></td>
-                            <td className="px-4 py-4"><StatusBadge status={application.status} /></td>
+                            <td className="border-r border-[#EDE8DE] px-4 py-4 font-sans text-[10px] text-[#69756D]">{formatDate(application.createdAt)}</td>
+                            <td className="border-r border-[#EDE8DE] px-4 py-4"><span className="inline-flex items-center gap-1 font-sans text-[10px] text-[#245A43]"><CircleCheckBig size={13} /> {countDocuments(application)} / 3</span></td>
+                            <td className="border-r border-[#EDE8DE] px-4 py-4"><StatusBadge status={application.status} /></td>
                             <td className="px-4 py-4 text-right">
                               <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#3C56D7] transition hover:bg-[#DDE2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3C56D7]" onClick={(event) => { event.stopPropagation(); toggleApplication(application.id) }} aria-label={`${isSelected ? 'Fermer' : 'Ouvrir'} le dossier de ${application.firstName} ${application.lastName}`}>
                                 <ChevronRight size={18} />
@@ -846,7 +846,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               )}
             </div>
             {!loadError && !isLoading && filteredApplications.length > 0 && (
-              <nav className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#D4CCBE] bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4" aria-label="Pagination des dossiers">
+              <nav className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#D4CCBE] bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 xl:shrink-0" aria-label="Pagination des dossiers">
                 <p className="font-sans text-xs text-[#69756D]">
                   Dossiers <span className="font-semibold text-[#27322C]">{firstApplicationIndex}–{lastApplicationIndex}</span> sur {filteredApplications.length}
                 </p>
@@ -886,13 +886,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               </nav>
             )}
             {selectedApplication && (
-              <div className="mt-5 hidden lg:block 2xl:hidden">
+              <div className="mt-5 hidden lg:block xl:hidden">
                 <DetailPanel key={selectedApplication.id} application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} onDelete={() => setIsDeleteConfirmationOpen(true)} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
               </div>
             )}
           </div>
           {selectedApplication && (
-            <div className="hidden 2xl:block">
+            <div className="hidden xl:block">
               <DetailPanel key={selectedApplication.id} application={selectedApplication} onStatusChange={(status) => setPendingStatus(status)} onDelete={() => setIsDeleteConfirmationOpen(true)} isSavingStatus={isSavingStatus} isDeleting={isDeleting} statusError={statusError} deleteError={deleteError} />
             </div>
           )}
